@@ -1,0 +1,103 @@
+---
+title: Webhooks
+description: Register HTTPS endpoints for sale events in your workspace and verify the HMAC-SHA256 signature on each delivery.
+---
+
+A webhook is an HTTPS endpoint in your system that FreeTicket calls when something happens in your workspace. Managing webhooks requires the `ADMIN` role.
+
+:::warning[Delivery is currently paused]
+You can register, list, edit and delete webhooks today, but FreeTicket is not sending deliveries at the moment. Registered endpoints start receiving events when delivery resumes. Until then, poll `GET /sales?status=CONFIRMED&from=<last-check>` to detect new sales.
+:::
+
+## Events
+
+| Event | Status |
+| --- | --- |
+| `sale.confirmed` | A sale was confirmed, either paid or recorded as comp/offline. |
+| `sale.refunded` | Reserved: you can subscribe to it now, but it is not emitted yet. |
+
+## Register an endpoint
+
+```bash
+curl -X POST https://admin.appfreeticket.com/api/v1/webhooks \
+  -H "Authorization: Bearer ft_live_xxx" \
+  -H "X-Workspace-Id: <workspace-id>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://example.com/hooks/freeticket",
+    "events": ["sale.confirmed"]
+  }'
+```
+
+The response includes `signingSecret`, **only this once**. Store it in your secrets manager. You can pass your own `secret` in the body instead of letting FreeTicket generate one.
+
+The URL must be `http(s)` and publicly reachable: `localhost`, private and link-local addresses are rejected. Use HTTPS in production.
+
+With the CLI:
+
+```bash
+ft webhooks create --data '{"url":"https://example.com/hooks/freeticket","events":["sale.confirmed"]}'
+ft webhooks list
+ft webhooks delete <id>
+```
+
+`PATCH /webhooks/{id}` changes `url`, `events` or `active` without rotating the signing secret. To rotate it, create a new webhook and delete the old one.
+
+## Delivery format
+
+Each delivery is a `POST` with a JSON body:
+
+```json
+{
+  "event": "sale.confirmed",
+  "data": { "saleId": "…", "organizationId": "…", "reference": "…", "total": 80000 },
+  "sentAt": "2026-10-04T18:22:31.512Z"
+}
+```
+
+`data.organizationId` is the workspace id. Send it as `X-Workspace-Id` when you fetch the full sale with `GET /sales/{saleId}`.
+
+The request carries the header:
+
+```http
+X-FreeTicket-Signature: <hex HMAC-SHA256 of the raw body, keyed with your signing secret>
+```
+
+## Verify the signature
+
+Compute the HMAC over the **raw** request body, before you parse it, and compare in constant time:
+
+<CodeGroup>
+
+```ts Node.js
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+export function isValidSignature(rawBody: string, header: string | null, secret: string) {
+  if (!header) return false;
+  const expected = createHmac("sha256", secret).update(rawBody).digest("hex");
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(header, "hex");
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+```
+
+```python Python
+import hashlib, hmac
+
+def is_valid_signature(raw_body: bytes, header: str | None, secret: str) -> bool:
+    if not header:
+        return False
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, header)
+```
+
+</CodeGroup>
+
+Reject the request with `401` when the signature doesn't match.
+
+## Respond fast
+
+- Return a `2xx` within **5 seconds**. Slower responses count as failures. Acknowledge first and do the work afterwards, for example in a queue.
+- Deliveries are best-effort and **not retried**. Treat the webhook as a fast signal and reconcile periodically against `GET /sales`.
+- Make your handler idempotent on `data.saleId`.
+- `GET /webhooks` shows `lastDeliveryAt`, `lastDeliveryStatus` and `failureCount` (consecutive failures) for each endpoint.

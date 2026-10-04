@@ -1,0 +1,47 @@
+---
+title: Overview
+description: The two FreeTicket HTTP APIs, what each one is for, and the conventions they share.
+---
+
+FreeTicket has two HTTP APIs. Pick by **who is calling**.
+
+| | B2B API | Public storefront API |
+| --- | --- | --- |
+| Base URL | `https://admin.appfreeticket.com/api/v1` | `https://appfreeticket.com/api/public` |
+| Caller | An organizer, venue or artist operating their workspace | A buyer, or an agent acting for one |
+| Auth | Organization-scoped API key | None (one exception for numbered seats) |
+| Scope | Everything in your workspace: events, sales, tickets, reports… | Published events, availability, orders |
+| Reference | [/reference/v1](/reference/v1) | [/reference/public](/reference/public) |
+
+The [CLI](/cli) and the [MCP server](/mcp) are clients of these same APIs, so the rules on this page apply to them too.
+
+## Core model
+
+A **workspace** is one organizer, venue or artist account. Inside it:
+
+- An **event** has one or more **dates** (sessions). A date carries its own start time and IANA time zone.
+- A **ticket type** belongs to one event date and has a price, currency and capacity.
+- A **sale** is an order. It has items, and each item produces individual **tickets**, identified by a ticket code (the QR payload).
+- **Membership plans** gate presales and members-only tickets.
+
+Money is a number in the resource's `currency` (usually `COP`). Timestamps are ISO 8601 in UTC.
+
+## Guides
+
+<CardGroup cols={2}>
+  <Card title="Authentication" href="/guides/authentication" icon="key-round">
+    API keys, scopes, roles and the workspace header.
+  </Card>
+  <Card title="Quickstart" href="/guides/quickstart" icon="rocket">
+    Create an event, put it on sale and track sales, end to end.
+  </Card>
+  <Card title="Errors, pagination and limits" href="/guides/conventions" icon="list-checks">
+    The response envelope, cursor pagination, retries and idempotency.
+  </Card>
+  <Card title="Webhooks" href="/guides/webhooks" icon="webhook">
+    Register endpoints and verify signed deliveries.
+  </Card>
+  <Card title="Public storefront API" href="/guides/public-api" icon="store">
+    Sell from your own site or agent without an API key.
+  </Card>
+</CardGroup>

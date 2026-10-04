@@ -1,0 +1,129 @@
+---
+title: Tool catalog
+description: Every FreeTicket MCP tool grouped by domain, with the API operation it calls.
+---
+
+Each tool calls one API operation and returns what the API returns. Roles, validation and errors are the same as in the [B2B API reference](/reference/v1). Tools marked **destructive** ask for confirmation in clients that support it.
+
+## Public (no credential)
+
+Available on both `/mcp` and `/mcp/public`.
+
+| Tool | Does |
+| --- | --- |
+| `public_events_list` | Search the catalog of published events |
+| `public_events_get` | Event detail by slug |
+| `public_events_availability` | Live stock and buyer prices per date and ticket type. Check it before creating an order. |
+| `public_orders_create` | Create an order and return the payment link for the buyer |
+| `public_orders_get` | Order status (`pending`, `paid`, `expired`, `cancelled`), plus tickets once paid |
+| `public_tickets_resend` | Resend the ticket email to the buyer's original address |
+
+Public ordering covers general admission tickets that are not members-only.
+
+## Session
+
+| Tool | Does |
+| --- | --- |
+| `whoami` | Your user, your workspaces and your role in each |
+
+## Events and dates
+
+| Tool | Does |
+| --- | --- |
+| `events_list` · `events_get` | List events (filters: `q`, `status`) or get one |
+| `events_create` | Create an event with its dates |
+| `events_update` · `events_publish` | Edit an event, or publish a draft |
+| `events_delete` | Delete an event. **Destructive.** |
+| `event_dates_list` · `event_dates_create` · `event_dates_update` | Dates of an event |
+| `event_dates_delete` | Delete a date. **Destructive.** |
+
+## Ticket types and tickets
+
+| Tool | Does |
+| --- | --- |
+| `ticket_types_list` · `ticket_types_get` | Ticket types with price breakdown and stock |
+| `ticket_types_create` · `ticket_types_update` | Create one, or change price, stock or visibility |
+| `ticket_types_delete` | Delete a ticket type. **Destructive.** |
+| `tickets_access` | Check a ticket by its code, without admitting it |
+| `tickets_checkin` | Admit a ticket at the door |
+| `tickets_resend` | Resend a ticket email |
+
+## Sales
+
+| Tool | Does |
+| --- | --- |
+| `sales_list` · `sales_get` | List sales with filters, or get one with its items |
+| `sales_tickets` | Individual tickets and attendees of a sale |
+| `sales_create` | Record a comp or direct sale |
+| `sales_cancel` · `sales_refund` | Cancel or refund a sale. **Destructive.** |
+
+## Memberships
+
+| Tool | Does |
+| --- | --- |
+| `plans_list` · `plans_get` · `plans_subscribers` | Plans and their members |
+| `plans_create` · `plans_update` | Manage plans |
+| `plans_delete` · `subscriptions_cancel` | Delete a plan, or cancel a subscription. **Destructive.** |
+
+## Venues, staff, discounts and webhooks
+
+| Tool | Does |
+| --- | --- |
+| `venues_list` · `venues_get` · `venues_create` · `venues_update` | Venues |
+| `venues_delete` | Delete a venue. **Destructive.** |
+| `staff_list` · `staff_create` · `staff_update_role` | Staff with access to the workspace |
+| `discounts_list` · `discounts_create` · `discounts_update` | Discount codes |
+| `discounts_delete` | Delete a discount code. **Destructive.** |
+| `webhooks_list` · `webhooks_create` | Webhook endpoints. See [Webhooks](/guides/webhooks). |
+| `webhooks_delete` | Delete a webhook. **Destructive.** |
+
+## Reports and exports
+
+| Tool | Does |
+| --- | --- |
+| `reports_summary` | KPIs for the active workspace |
+| `reports_by_event` | Revenue, tickets sold and availability per event |
+| `reports_timeseries` | Revenue and tickets over time |
+| `reports_inventory` | Capacity, sold, reserved and available per event, date or ticket type |
+| `reports_financials` | Per-date financial statement and net to settle |
+| `reconciliation` | Payment ↔ sale ↔ invoice reconciliation, flagging mismatches |
+| `reports_export_buyers` · `reports_export_attendees` · `reports_export_subscribers` · `reports_export_reconciliation` | Exports |
+
+## Settlements
+
+| Tool | Does |
+| --- | --- |
+| `settlements_list` | Payouts from FreeTicket to the organizer |
+| `settlements_document` · `settlements_proof` | A signed download link for the settlement PDF or a payment proof, valid for 5 minutes |
+
+## Content
+
+| Tool | Does |
+| --- | --- |
+| `content_videos` · `content_posts` · `content_lives` · `content_live_get` | Published videos, community posts and live streams |
+| `content_playback_token` | Signed playback token: 1 hour for video, 30 minutes for live. Members-only content also needs a buyer session. |
+
+## Credentials
+
+| Tool | Does |
+| --- | --- |
+| `api_keys_list` | Audit which API keys exist and when they were last used. Never returns secrets. |
+
+Creating and revoking keys is not available as a tool. Use the [CLI](/cli/commands#api-keys) or the API.
+
+## Members area (enterprise)
+
+`customer_me`, `customer_tickets`, `customer_ticket_get`, `customer_membership`, `customer_profile`, `customer_profile_update`, `customer_subscribe`, `customer_subscription_cancel`, `customer_ticket_cancel` and `customer_logout` act on behalf of a signed-in buyer. They require an enterprise service API key plus the buyer's session token. See [Credentials](/mcp/authentication#buyer-sessions).
+
+## Rendered results
+
+In clients that support the MCP Apps extension, list and report tools render as a table or KPI tiles instead of raw JSON. The view is self-contained and makes no network requests. Other clients receive the same data as text.
+
+## Global mode
+
+Most list and report tools accept `workspace`:
+
+- `"all"`: aggregate every workspace you can access.
+- `["id1", "id2"]`: aggregate only those workspaces.
+
+Rows are tagged with `workspaceId` and `workspaceName`. `reports_summary` returns KPIs for one workspace only, because KPIs can't be added up across workspaces.

@@ -1,0 +1,122 @@
+---
+title: Connect a client
+description: Add the hosted FreeTicket MCP server to Claude, Claude Code, ChatGPT, Cursor or any client that supports remote MCP servers.
+---
+
+Every client uses the same server URL:
+
+```text
+https://mcp.appfreeticket.com/mcp
+```
+
+When you connect, the client opens a FreeTicket sign-in page. Choose **Continue with FreeTicket**, sign in with your usual account, and approve. If you belong to several workspaces, you choose which one to connect. There is no key to copy. See [Credentials](/mcp/authentication) for the other options.
+
+<Tabs>
+  <Tab title="Claude (claude.ai and desktop)">
+
+<Steps>
+  <Step title="Add a custom connector">
+    Open **Settings → Connectors → Add custom connector**.
+  </Step>
+  <Step title="Enter the server URL">
+    Name it `FreeTicket` and use `https://mcp.appfreeticket.com/mcp`. Leave the OAuth client ID and secret empty: the server registers the client automatically.
+  </Step>
+  <Step title="Connect and approve">
+    Choose **Connect**, sign in to FreeTicket, approve, and enable the connector in your chat.
+  </Step>
+</Steps>
+
+  </Tab>
+  <Tab title="Claude Code">
+
+```bash
+claude mcp add --transport http freeticket https://mcp.appfreeticket.com/mcp
+```
+
+Then run `/mcp` inside Claude Code, select `freeticket`, and authenticate in the browser.
+
+To use an API key instead, for example on a headless machine:
+
+```bash
+claude mcp add --transport http freeticket https://mcp.appfreeticket.com/mcp \
+  --header "Authorization: Bearer ft_live_xxx"
+```
+
+Or install the FreeTicket plugin, which adds the server and the [agent skills](/mcp/skills) together:
+
+```text
+/plugin marketplace add AppFreeticket/agent-skills
+/plugin install freeticket@freeticket
+```
+
+  </Tab>
+  <Tab title="ChatGPT">
+
+<Steps>
+  <Step title="Enable developer mode">
+    In ChatGPT settings, turn on developer mode for connectors. Your plan and workspace must allow custom connectors.
+  </Step>
+  <Step title="Create the connector">
+    Add a new connector with the URL `https://mcp.appfreeticket.com/mcp` and OAuth authentication.
+  </Step>
+  <Step title="Sign in">
+    Approve access on the FreeTicket page. If no tools appear right away, refresh the connector.
+  </Step>
+</Steps>
+
+  </Tab>
+  <Tab title="Cursor">
+
+Add the server to `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project):
+
+```json
+{
+  "mcpServers": {
+    "freeticket": {
+      "url": "https://mcp.appfreeticket.com/mcp"
+    }
+  }
+}
+```
+
+Cursor opens the FreeTicket sign-in the first time it uses the server. To use an API key instead, add `"headers": { "Authorization": "Bearer ft_live_xxx" }`.
+
+  </Tab>
+  <Tab title="Other clients">
+
+Any client that supports remote MCP servers over **Streamable HTTP** works:
+
+- **OAuth-capable clients:** point them at `https://mcp.appfreeticket.com/mcp`. The server supports discovery (RFC 9728 and RFC 8414), dynamic client registration (RFC 7591), and authorization code with PKCE.
+- **Header-based clients:** send `Authorization: Bearer ft_live_xxx`.
+- **Buyer-side agents with no account:** use `https://mcp.appfreeticket.com/mcp/public`.
+
+To test from the command line:
+
+```bash
+curl -X POST https://mcp.appfreeticket.com/mcp/public \
+  -H 'content-type: application/json' \
+  -H 'accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+  </Tab>
+</Tabs>
+
+## Try it
+
+Once connected, ask your assistant:
+
+- "Who am I in FreeTicket, and which workspaces can I access?"
+- "List my published events and their next dates."
+- "How did sales go in the last 30 days?"
+- "Show inventory for the next event, by ticket type."
+- "Find comedy events in Bogotá this month."
+
+## Troubleshooting
+
+| Symptom | Likely cause |
+| --- | --- |
+| Only `public_*` tools appear | You connected to `/mcp/public`, or the client didn't complete the sign-in on `/mcp` |
+| A write tool returns `403` | Your role in that workspace is too low, or the key is `read`-scoped |
+| A list comes back empty | You are looking at another workspace. Ask the assistant to call `whoami`, or pass `workspace: "all"`. |
+| `401` after a while | The session expired or the key was revoked. Reconnect. |

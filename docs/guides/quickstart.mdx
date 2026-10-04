@@ -1,0 +1,195 @@
+---
+title: "Quickstart: create an event and sell tickets"
+description: Create a venue, an event, a date and a ticket type over the B2B API, publish the event, sell tickets through the public API, and track the sales.
+sidebar:
+  label: Quickstart
+---
+
+This guide goes through the full lifecycle with `curl`. Each step uses an id returned by the step before it. The same calls are available as [CLI commands](/cli/commands) and [MCP tools](/mcp/tools).
+
+You need a key with `write` scope and the `ADMIN` role in the target workspace. See [Authentication](/guides/authentication).
+
+```bash
+export FT=https://admin.appfreeticket.com/api/v1
+export FT_KEY=ft_live_xxx
+export WS=<workspace-id>   # from GET /me
+```
+
+<Steps>
+  <Step title="Check who you are">
+
+```bash
+curl -s $FT/me -H "Authorization: Bearer $FT_KEY"
+```
+
+Copy the `id` of the workspace you want to work on from `workspaces[]` into `WS`.
+
+  </Step>
+  <Step title="Create a venue">
+
+```bash
+curl -s -X POST $FT/venues \
+  -H "Authorization: Bearer $FT_KEY" \
+  -H "X-Workspace-Id: $WS" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Teatro Ejemplo",
+    "address": "Calle 1 # 2-3",
+    "city": "Bogotá",
+    "country": "CO",
+    "capacity": 500
+  }'
+```
+
+Save `data.id` as `VENUE_ID`. A venue is optional. Skip it for an online event.
+
+  </Step>
+  <Step title="Create the event with its first date">
+
+```bash
+curl -s -X POST $FT/events \
+  -H "Authorization: Bearer $FT_KEY" \
+  -H "X-Workspace-Id: $WS" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Concierto de prueba",
+    "slug": "concierto-de-prueba",
+    "description": "Una noche de música en vivo.",
+    "venueId": "'"$VENUE_ID"'",
+    "dates": [
+      { "startsAt": "2026-12-12T01:00:00Z", "timezone": "America/Bogota" }
+    ]
+  }'
+```
+
+The event is created as `DRAFT`. Save `data.id` as `EVENT_ID` and `data.nextDate.id` as `DATE_ID`.
+
+To add more dates later, use `POST /events/{id}/dates`, or list them with `GET /events/{id}/dates`.
+
+  </Step>
+  <Step title="Add a ticket type">
+
+```bash
+curl -s -X POST $FT/ticket-types \
+  -H "Authorization: Bearer $FT_KEY" \
+  -H "X-Workspace-Id: $WS" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventDateId": "'"$DATE_ID"'",
+    "name": "General",
+    "price": 80000,
+    "currency": "COP",
+    "capacity": 300,
+    "maxPerOrder": 10,
+    "isVisible": true,
+    "organizerAbsorbsFee": false
+  }'
+```
+
+Save `data.id` as `TICKET_TYPE_ID`. The response also includes the buyer-facing breakdown (`buyerServiceFee`, `iva`, `buyerTotal`): the price the buyer actually pays per unit. Set `saleStartsAt` and `saleEndsAt` to open and close sales on a schedule.
+
+  </Step>
+  <Step title="Publish">
+
+```bash
+curl -s -X POST $FT/events/$EVENT_ID/publish \
+  -H "Authorization: Bearer $FT_KEY" \
+  -H "X-Workspace-Id: $WS"
+```
+
+Publishing needs at least one future date. Without one, it returns `409`. Once published, the event can be sold through the storefront and the public API.
+
+  </Step>
+  <Step title="Sell a ticket">
+
+<Tabs>
+  <Tab title="Buyer checkout (public API)">
+
+The public API needs no key. It creates a pending order and returns a payment link for the buyer:
+
+```bash
+curl -s -X POST https://appfreeticket.com/api/public/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "buyerName": "Laura Gómez",
+    "buyerEmail": "laura@example.com",
+    "items": [{ "ticketTypeId": "'"$TICKET_TYPE_ID"'", "quantity": 2 }]
+  }'
+```
+
+The response `data` holds `orderId`, `reference`, `status` (`pending`), the authoritative `total` and `currency`, a `checkoutUrl` and `expiresAt`. Send the buyer to `checkoutUrl`. The stock is held until `expiresAt`. Poll `GET /orders/{orderId}` until `status` is `paid`. The tickets are then emailed to the buyer. See [Public storefront API](/guides/public-api).
+
+  </Tab>
+  <Tab title="Comp or offline sale (B2B API)">
+
+Record a sale that is already settled, such as a complimentary ticket or a sale paid outside FreeTicket. It is created as `CONFIRMED` and nothing is charged:
+
+```bash
+curl -s -X POST $FT/sales \
+  -H "Authorization: Bearer $FT_KEY" \
+  -H "X-Workspace-Id: $WS" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: comp-laura-001" \
+  -d '{
+    "buyer": { "name": "Laura Gómez", "email": "laura@example.com" },
+    "items": [{ "ticketTypeId": "'"$TICKET_TYPE_ID"'", "quantity": 1 }],
+    "channel": "ADMIN",
+    "comp": true
+  }'
+```
+
+With `comp: true` the unit price is zero. The `Idempotency-Key` makes retries safe. See [Idempotency](/guides/conventions#idempotency).
+
+  </Tab>
+</Tabs>
+
+  </Step>
+  <Step title="Track sales and inventory">
+
+```bash
+# Confirmed sales for the event
+curl -s "$FT/sales?event=$EVENT_ID&status=CONFIRMED" \
+  -H "Authorization: Bearer $FT_KEY" -H "X-Workspace-Id: $WS"
+
+# Capacity, sold, reserved and available per ticket type
+curl -s "$FT/reports/inventory?eventId=$EVENT_ID" \
+  -H "Authorization: Bearer $FT_KEY" -H "X-Workspace-Id: $WS"
+```
+
+`GET /sales/{id}/tickets` returns the individual tickets of a sale, each with its ticket code.
+
+  </Step>
+  <Step title="Check tickets in at the door">
+
+```bash
+# Read-only: is this ticket valid?
+curl -s $FT/tickets/<ticket-code>/access \
+  -H "Authorization: Bearer $FT_KEY" -H "X-Workspace-Id: $WS"
+
+# Admit it. Idempotent, so a second scan doesn't admit it twice.
+curl -s -X POST $FT/tickets/<ticket-code>/checkin \
+  -H "Authorization: Bearer $FT_KEY" -H "X-Workspace-Id: $WS"
+```
+
+Door staff only need the `STAFF` role.
+
+  </Step>
+</Steps>
+
+## The same flow from the CLI
+
+```bash
+ft venues create --data @venue.json
+ft events create --data @event.json
+ft ticket-types create --data @ticket-type.json
+ft events publish <event-id>
+ft sales list --event <event-id> --status CONFIRMED
+ft reports inventory --event <event-id>
+ft tickets checkin <ticket-code>
+```
+
+## Next steps
+
+- [Errors, pagination and limits](/guides/conventions): handle failures and walk long lists.
+- [Webhooks](/guides/webhooks): register for sale events.
+- [B2B API reference](/reference/v1): every field of every operation.

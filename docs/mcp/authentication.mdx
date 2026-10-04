@@ -1,0 +1,66 @@
+---
+title: Credentials
+description: The three ways to access the FreeTicket MCP server, anonymous public, OAuth sign-in and API key, and how each one picks a workspace.
+---
+
+The tools you see depend on the credential the client sends.
+
+| Layer | Endpoint | Credential | Tools |
+| --- | --- | --- | --- |
+| Public (B2C) | `/mcp/public` | None | `public_*`: discovery, availability, orders, ticket resend |
+| OAuth sign-in | `/mcp` | Token issued after you sign in to FreeTicket | Public tools plus B2B tools for your workspaces |
+| API key | `/mcp` | `Authorization: Bearer ft_live_xxx` | Public tools plus B2B tools for your workspaces |
+
+In every layer, B2B tools act with **your role** in the target workspace, exactly like the [API](/guides/authentication#roles).
+
+## Public
+
+No account and no setup. Use this layer for agents that help buyers: they search published events, read live availability, and create an order that returns a payment link for the buyer. The agent never processes the payment.
+
+```text
+https://mcp.appfreeticket.com/mcp/public
+```
+
+## OAuth sign-in
+
+This is the default for chat clients like Claude and ChatGPT, which can't send custom headers:
+
+<Steps>
+  <Step title="Discovery">
+    An unauthenticated request to `/mcp` returns `401` with a `WWW-Authenticate` header that points to `/.well-known/oauth-protected-resource`. The client discovers the authorization server from there.
+  </Step>
+  <Step title="Client registration">
+    The client registers itself automatically (dynamic client registration), so there is no client ID or secret to fill in.
+  </Step>
+  <Step title="Sign in and approve">
+    The consent page offers **Continue with FreeTicket**. You sign in with your normal account and approve, using the same device flow as `ft login`. If you belong to several workspaces, you pick one.
+  </Step>
+  <Step title="Token">
+    The client receives an access token and a refresh token, and renews the access token without asking you again.
+  </Step>
+</Steps>
+
+The consent page also has advanced options for pasting an API key by hand.
+
+## API key
+
+For clients that can send headers, such as Claude Code, Cursor, scripts and CI, pass a FreeTicket API key directly:
+
+```http
+Authorization: Bearer ft_live_xxx
+X-Workspace-Id: <workspace-id>      # optional
+```
+
+Create a dedicated key with `ft api-keys create mcp-agent --scope read` (or `--scope write`). Prefer a `read` key for analysis-only agents: write tools then fail with `403 READ_ONLY_KEY` instead of acting. See [Authentication](/guides/authentication).
+
+## Choosing the workspace
+
+- Without a workspace selection, tools run against your default workspace, or the one you picked during OAuth sign-in.
+- With an API key, `X-Workspace-Id` sets the workspace for the whole connection.
+- List and report tools accept a `workspace` argument: `"all"` aggregates every workspace you can access, and an array of ids aggregates only those. Each row is tagged with `workspaceId` and `workspaceName`.
+
+Call the `whoami` tool to see your user, your workspaces and your role in each.
+
+## Buyer sessions
+
+The `customer_*` tools (a buyer's own tickets, membership and profile) are for enterprise integrations that already hold a buyer session. They require an enterprise service API key in addition to the buyer's session token. Ordinary workspace keys can't use them.

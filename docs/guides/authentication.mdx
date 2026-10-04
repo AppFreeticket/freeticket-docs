@@ -1,0 +1,133 @@
+---
+title: Authentication
+description: Authenticate to the B2B API with an organization-scoped API key, choose a scope, and select the workspace you operate on.
+---
+
+Every `/api/v1` request is authenticated with an **API key**. A key belongs to a user and acts with that user's role in the workspace it targets. It never grants more than the user has in the dashboard.
+
+Keys start with `ft_live_`. FreeTicket stores only a hash, so the secret is shown **once**, when the key is created.
+
+## Get a key
+
+There are two ways to get a key. Both need a FreeTicket account with access to at least one workspace.
+
+<Tabs>
+  <Tab title="With the CLI (recommended)">
+
+```bash
+npm install -g @freeticket/cli
+ft login                                   # approve in the browser
+ft api-keys create my-integration --scope write
+```
+
+`ft login` uses the OAuth 2.0 device flow: it prints a short code, opens your browser, and you approve the session where you are already signed in. Then `ft api-keys create` mints a dedicated key for your integration and prints the secret once.
+
+Optional: `--expires 2027-01-01` sets an expiry date.
+
+  </Tab>
+  <Tab title="With the API">
+
+If you already hold a key, mint another one with `POST /api-keys`:
+
+```bash
+curl -X POST https://admin.appfreeticket.com/api/v1/api-keys \
+  -H "Authorization: Bearer ft_live_xxx" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my-integration", "scope": "write"}'
+```
+
+The plaintext key is only in this response. Creating keys requires the `ADMIN` role.
+
+  </Tab>
+</Tabs>
+
+List and revoke keys with `ft api-keys list` and `ft api-keys revoke <id>`, or `GET /api-keys` and `DELETE /api-keys/{id}`.
+
+:::tip
+Use one key per integration. You can then revoke a single integration without breaking the others.
+:::
+
+## Send the key
+
+Send the key as a bearer token:
+
+```http
+Authorization: Bearer ft_live_xxx
+```
+
+The raw key in an `x-api-key` header also works:
+
+```http
+x-api-key: ft_live_xxx
+```
+
+A missing, invalid, expired or revoked key returns `401`.
+
+## Scopes
+
+Each key has one scope:
+
+| Scope | Allows |
+| --- | --- |
+| `read` | `GET` and `HEAD` only |
+| `write` | Reads, plus create, update, delete, publish, cancel, refund and check-in |
+
+A `read` key that calls a mutating method gets `403` with the code `READ_ONLY_KEY`. Keys created with `POST /api-keys` or `ft api-keys create` default to `read`. The session that `ft login` stores in the CLI can write.
+
+The scopes are also published in machine-readable form at `https://admin.appfreeticket.com/.well-known/oauth-protected-resource` (RFC 9728).
+
+## Roles
+
+Scope says what a key *may* do. The user's **role in the target workspace** says what it *can* do. Each operation in the [reference](/reference/v1) states its minimum role:
+
+| Role | Typical access |
+| --- | --- |
+| `VIEWER` | Read events, ticket types, sales lists, plans, venues and most reports |
+| `STAFF` | Plus sale details, a sale's tickets, ticket access checks and door check-in |
+| `ADMIN` | Plus every write, staff management, exports, settlements, discounts, webhooks and API keys |
+
+The role is resolved on every request, so changing a user's role takes effect without reissuing their keys. A role below the minimum returns `403`. If the user's access to the workspace expired or doesn't cover a section, the API returns `403` with `ACCESS_EXPIRED` or `SECTION_FORBIDDEN`.
+
+## Workspaces
+
+A user can belong to several workspaces. Choose one per request with the `X-Workspace-Id` header:
+
+```bash
+curl https://admin.appfreeticket.com/api/v1/events \
+  -H "Authorization: Bearer ft_live_xxx" \
+  -H "X-Workspace-Id: <workspace-id>"
+```
+
+Without the header, the request runs against the user's default workspace. `GET /me` lists every workspace the key can reach, with the user's role in each:
+
+```bash
+curl https://admin.appfreeticket.com/api/v1/me \
+  -H "Authorization: Bearer ft_live_xxx"
+```
+
+```json
+{
+  "data": {
+    "userId": "…",
+    "name": "Ana",
+    "email": "ana@example.com",
+    "role": "ADMIN",
+    "activeWorkspaceId": "…",
+    "workspaces": [
+      { "id": "…", "name": "My Venue", "slug": "my-venue", "role": "ADMIN", "sections": null }
+    ]
+  }
+}
+```
+
+In each workspace row, `sections: null` means unrestricted access and `[]` means access has expired or been revoked. Use the `role` in each row. The top-level `role` is deprecated.
+
+:::warning
+`X-Workspace-Id` takes a workspace **id**, not a slug. An id the key can't reach is ignored, and the request falls back to the default workspace. Read ids from `GET /me` rather than hard-coding them.
+:::
+
+## Keep keys safe
+
+- Keep keys server-side. Never ship them in a browser bundle or a mobile app. For buyer-facing flows, use the [public storefront API](/guides/public-api), which needs no key.
+- Prefer `read` keys for dashboards, reporting and BI.
+- Set an expiry on keys for temporary work, and revoke the keys you no longer use.

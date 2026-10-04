@@ -1,0 +1,159 @@
+---
+title: Command reference
+description: Every ft command grouped by resource, with its flags and the minimum workspace role it needs.
+---
+
+Each command calls one [B2B API](/reference/v1) operation and needs the same minimum role in the target workspace. Run `ft <command> --help` for the exact flags of your installed version.
+
+## Shared flags
+
+| Flag | Applies to | Purpose |
+| --- | --- | --- |
+| `--json` | All commands | Raw JSON on stdout. On lists, the `data` array only. |
+| `--workspace <id>` | All commands | Target one workspace. See [Workspaces](/cli/workspaces). |
+| `--limit <n>` | Lists | Page size, 1 to 100 (default 20) |
+| `--cursor <id>` | Lists | Continue from a previous page (single workspace only) |
+| `--all` | Lists | Fetch every page |
+| `--raw` | Lists | JSON with the `{ data, page }` envelope, including `page.nextCursor` |
+| `--columns <a,b,c>` | Lists | Choose the columns to show |
+| `--full` | Lists | Show every field |
+| `--csv` | Lists and reports | CSV output |
+| `--data <json>` | Writes | Request body: inline JSON or `@file.json` |
+| `--yes` | Deletes | Skip the confirmation prompt |
+
+Write commands take the same JSON body the API does. The [API reference](/reference/v1) documents every field.
+
+## Session and workspaces
+
+| Command | Purpose |
+| --- | --- |
+| `ft login` | Browser login. `--key <key>` for CI. See [Log in](/cli/login). |
+| `ft whoami` | Your user and workspaces |
+| `ft config` | Show the active configuration, with the credential masked |
+| `ft logout` | Remove the stored credential |
+| `ft workspace list` · `use <id\|slug>` · `clear` · `show` | List, pin, unpin and show workspaces |
+
+## Events and dates
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft events list` | VIEWER | Filters: `--q <text>`, `--status <DRAFT\|PUBLISHED\|SOLD_OUT\|CANCELLED\|COMPLETED>`, `--with-total` |
+| `ft events get <id>` | VIEWER | One event |
+| `ft events create --data <json>` | ADMIN | Create an event with its dates |
+| `ft events update <id> --data <json>` | ADMIN | Update an event |
+| `ft events delete <id>` | ADMIN | Delete an event (soft delete) |
+| `ft events publish <id>` | ADMIN | Publish. Needs at least one future date. |
+| `ft event-dates list <eventId>` | VIEWER | Dates of an event |
+| `ft event-dates create <eventId> --data <json>` | ADMIN | Add a date |
+| `ft event-dates update <eventId> <dateId> --data <json>` | ADMIN | Update a date |
+| `ft event-dates delete <eventId> <dateId>` | ADMIN | Delete a date |
+
+```bash
+ft events create --data '{
+  "name": "Concierto de prueba",
+  "slug": "concierto-de-prueba",
+  "dates": [{ "startsAt": "2026-12-12T01:00:00Z", "timezone": "America/Bogota" }]
+}'
+```
+
+## Ticket types
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft ticket-types list` | VIEWER | Filter with `--event-date-id <id>` |
+| `ft ticket-types get <id>` | VIEWER | One ticket type, with price breakdown and stock |
+| `ft ticket-types create --data <json>` | ADMIN | Create a ticket type on an event date |
+| `ft ticket-types update <id> --data <json>` | ADMIN | Update price, capacity, sales window… |
+| `ft ticket-types delete <id>` | ADMIN | Delete (soft delete) |
+
+## Sales
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft sales list` | VIEWER | Filters: `--status`, `--channel`, `--event`, `--event-date`, `--reference`, `--buyer`, `--from`, `--to` |
+| `ft sales get <id>` | STAFF | One sale with its items |
+| `ft sales tickets <id>` | STAFF | The individual tickets of a sale |
+| `ft sales create --data <json>` | ADMIN | Record a comp or offline sale, created as `CONFIRMED` |
+| `ft sales cancel <id>` | ADMIN | Cancel and release the stock |
+| `ft sales refund <id>` | ADMIN | Mark the sale refunded |
+
+Sale statuses are `PENDING`, `CONFIRMED`, `ABANDONED`, `CANCELLED` and `REFUNDED`. Channels are `WEB`, `MOBILE`, `POS` and `ADMIN`.
+
+`cancel` and `refund` take an optional `--data` body. When the API answers `409` because the payment state needs a human decision, it explains what to check. You can then repeat the command with `--data '{"acknowledge_open_payment":true}'` (cancel) or `--data '{"acknowledge_manual":true}'` (refund).
+
+:::warning
+A refund marks the sale as refunded, but the money only goes back automatically for some payment methods. For the others, return the money from your payment provider's dashboard. The [refund operation](/reference/v1) describes each case.
+:::
+
+## Tickets (door operations)
+
+Tickets are addressed by their **ticket code**, the QR payload.
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft tickets access <code>` | STAFF | Check whether a ticket is valid, without admitting it |
+| `ft tickets checkin <code>` | STAFF | Admit the ticket. Idempotent: a second scan doesn't admit it twice. |
+| `ft tickets resend <code>` | ADMIN | Resend the ticket email to the buyer |
+
+## Memberships
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft plans list` · `get <id>` | VIEWER | Membership plans |
+| `ft plans create` · `update <id>` · `delete <id>` | ADMIN | Manage plans (`--data <json>`) |
+| `ft plans subscribers <id>` | ADMIN | Members of a plan |
+| `ft subscriptions cancel <id>` | ADMIN | Cancel a subscription |
+
+## Venues, staff, discounts and webhooks
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft venues list` · `get <id>` | VIEWER | Venues |
+| `ft venues create` · `update <id>` · `delete <id>` | ADMIN | Manage venues |
+| `ft staff list` | ADMIN | Staff with access to the workspace. `--workspace-ids <a,b>` reads up to 25 workspaces in one call. |
+| `ft staff create --data <json>` | ADMIN | Add a staff user |
+| `ft staff set-role <id> --data '{"role":"STAFF"}'` | ADMIN | Change a staff member's role |
+| `ft discounts list` | ADMIN | Discount codes. Filters: `--event <id>`, `--active <true\|false>` |
+| `ft discounts create` · `update <id>` · `delete <id>` | ADMIN | Manage discount codes |
+| `ft webhooks list` · `create` · `delete <id>` | ADMIN | Webhook endpoints. See [Webhooks](/guides/webhooks). |
+
+## Reports and exports
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft reports summary` | VIEWER | KPIs. `--period 7d\|30d\|90d\|1y` (default `30d`) |
+| `ft reports by-event` | VIEWER | Revenue and tickets by event. `--from`, `--to`, `--status` |
+| `ft reports timeseries --interval <day\|week\|month>` | VIEWER | Confirmed sales over time. `--from`, `--to`, `--event` |
+| `ft reports inventory` | VIEWER | Capacity, sold, reserved and available. `--event`, `--event-date`, `--from`, `--to`, `--include-drafts`, `--group-by <ticketType\|date\|event>` |
+| `ft reports financials` | ADMIN | Per-date financial statement: gross, costs and net to settle. `--event`, `--past` |
+| `ft reports reconciliation --from <date> --to <date>` | ADMIN | Payment ↔ sale ↔ invoice reconciliation. `--match`, `--provider`, `--page`, `--page-size` |
+| `ft reports export buyers` | ADMIN | One row per sale. `--event`, `--event-date`, `--from`, `--to`, `--status` |
+| `ft reports export attendees` | ADMIN | One row per ticket, with the same filters |
+| `ft reports export subscribers` | ADMIN | Membership subscribers |
+| `ft reports export reconciliation --from <date> --to <date>` | ADMIN | Reconciliation export |
+
+Exports return up to 5,000 rows. Add `--csv` for spreadsheets.
+
+## Settlements
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft settlements list` | ADMIN | Payouts to the organizer. Filters: `--event`, `--status <SENT\|AWAITING_PAYMENT\|PAID>` |
+| `ft settlements document <id>` | ADMIN | Signed download URL for the settlement PDF, valid for 5 minutes. `--proof <fileName>` downloads a payment proof instead. |
+
+## Content
+
+| Command | Purpose |
+| --- | --- |
+| `ft content-videos list` | Published videos |
+| `ft content-posts list` | Community posts |
+| `ft content-lives list` · `get <id>` | Live streams |
+| `ft content-lives playback-token --data <json>` | Signed playback token. Members-only content also needs a buyer session. |
+
+## API keys
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft api-keys create <name>` | ADMIN | Mint a key. `--scope read\|write` (default `read`), `--expires <iso>`. The secret is shown once. |
+| `ft api-keys list` | VIEWER | Your keys, without secrets |
+| `ft api-keys revoke <id>` | VIEWER | Revoke one of your keys |

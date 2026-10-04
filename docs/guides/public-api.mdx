@@ -1,0 +1,125 @@
+---
+title: Public storefront API
+description: Browse published events, read live availability and create orders that hand the buyer a payment link, all without an API key.
+---
+
+The public API is built for buyers and their agents: a custom storefront, a chatbot, or an AI assistant that helps someone find and buy tickets. It is **anonymous**, read-mostly, and isolated from the B2B API.
+
+- Base URL: `https://appfreeticket.com/api/public`
+- Reference: [/reference/public](/reference/public)
+- Contract: `https://appfreeticket.com/api/public/openapi.json`
+
+:::note
+Your integration never handles card data. `POST /orders` returns a payment link, and the buyer pays there.
+:::
+
+## Endpoints
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/events` | Catalog of published events with an upcoming date |
+| `GET` | `/events/{slug}` | Event detail: description, dates, venue, prices from |
+| `GET` | `/events/{slug}/availability` | Live stock per date and ticket type |
+| `POST` | `/orders` | Create an order and get the payment link |
+| `GET` | `/orders/{id}` | Order status, plus ticket codes once paid |
+| `POST` | `/tickets/{code}/resend` | Resend the ticket email to the buyer |
+
+## Buy flow
+
+<Steps>
+  <Step title="Find the event">
+
+```bash
+curl -s "https://appfreeticket.com/api/public/events?q=concierto&city=Bogotá&sort=date_asc"
+```
+
+Filters: `q`, `city`, `from` and `to` (ISO 8601), `page`, `pageSize` (up to 50), and `sort` (`date_asc`, `price_asc`, `price_desc`). Each result has a `slug`.
+
+  </Step>
+  <Step title="Check availability">
+
+```bash
+curl -s https://appfreeticket.com/api/public/events/<slug>/availability
+```
+
+For each upcoming date, this returns its ticket types with `id`, `available`, `soldOut`, `maxPerOrder` and two prices:
+
+- `price`: the base price, without fees.
+- `buyerTotal`: what the buyer pays per unit, including service fee, VAT and any seating surcharge. **Quote this one.**
+
+Stock changes constantly, so don't cache availability aggressively.
+
+  </Step>
+  <Step title="Create the order">
+
+```bash
+curl -s -X POST https://appfreeticket.com/api/public/orders \
+  -H "Content-Type: application/json" \
+  -d '{
+    "buyerName": "Laura Gómez",
+    "buyerEmail": "laura@example.com",
+    "buyerPhone": "+57 300 000 0000",
+    "items": [{ "ticketTypeId": "<ticket-type-id>", "quantity": 2 }]
+  }'
+```
+
+The response returns `orderId`, `status: "pending"`, the authoritative `total`, a `checkoutUrl` and `expiresAt`. The stock is held for the buyer until `expiresAt`.
+
+  </Step>
+  <Step title="Send the buyer to pay">
+
+Redirect the buyer, or hand them the link, to `checkoutUrl`.
+
+Use `expiresAt` exactly as returned. Don't recompute it on the client. After that instant the hold is released, even if the link still opens.
+
+  </Step>
+  <Step title="Confirm">
+
+```bash
+curl -s https://appfreeticket.com/api/public/orders/<orderId>
+```
+
+`status` is `pending`, `paid`, `expired` or `cancelled`. While the order is `pending`, `expiresAt` is repeated so you can resume a countdown after a reload. Once it is `paid`, `tickets[]` lists the issued ticket codes, and the buyer receives the tickets by email.
+
+  </Step>
+</Steps>
+
+## Order errors
+
+`POST /orders` returns `409` with a specific `error.code` when the order can't be created:
+
+| Code | Meaning |
+| --- | --- |
+| `MEMBERS_ONLY` | The ticket is reserved for members |
+| `NOT_AVAILABLE` | The event or date is not published, or already took place |
+| `EXTERNAL_SALE` | The event sells on another site |
+| `SALE_CLOSED` | Outside the sales window |
+| `QUEUE_REQUIRED` | The date sells through a virtual waiting room. Send the buyer to `details.waitingRoomUrl` exactly as given. |
+| `MULTIPLE_ORGS` | The items belong to different organizers |
+| `MIXED_CURRENCY` | The items use different currencies |
+| `SEAT_NOT_AVAILABLE` | A requested seat is already sold or held |
+| `ADDON_SOLD_OUT` | A product bundled with the ticket sold out |
+
+Order creation is rate-limited per IP. On `429`, wait for the number of seconds in `Retry-After`. See [Rate limits](/guides/conventions#rate-limits).
+
+## Numbered seats
+
+For ticket types with assigned seating, availability includes `availableSeats`: the exact label of each free seat. Pass one label per unit in `items[].seats`.
+
+Orders with seats also require a **buyer session**. Send it in the `X-Customer-Session` header, or the browser sends the `ft-customer` cookie. Without a session, the API returns `401 CUSTOMER_SESSION_REQUIRED`. General admission orders stay anonymous.
+
+## Resend tickets
+
+```bash
+curl -s -X POST https://appfreeticket.com/api/public/tickets/<ticket-code>/resend \
+  -H "Content-Type: application/json" \
+  -d '{ "email": "laura@example.com" }'
+```
+
+This resends the ticket email to the address used in the purchase. The optional `email` must match it. The response shows the address masked. Limited to one resend per minute per ticket code.
+
+## Scope
+
+- Only published events with an upcoming date are listed.
+- Members-only tickets can't be ordered here.
+- One order can't mix organizers or currencies.

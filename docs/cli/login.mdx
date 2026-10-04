@@ -1,0 +1,75 @@
+---
+title: Log in
+description: Authenticate ft through the browser with the device flow, or with an API key in CI.
+---
+
+## Browser login (device flow)
+
+```bash
+ft login
+```
+
+```text
+Open https://admin.appfreeticket.com/device and enter the code:
+
+    WDJB-MJHT
+
+Opening your browser… (Ctrl+C to cancel)
+```
+
+The CLI uses the OAuth 2.0 Device Authorization Grant (RFC 8628), the same flow as `gh auth login`:
+
+<Steps>
+  <Step title="The CLI requests a code">
+    It prints a short code and opens the approval page in your browser.
+  </Step>
+  <Step title="You approve in the browser">
+    Sign in to FreeTicket as usual, check that the code matches, and approve. The code is valid for 10 minutes.
+  </Step>
+  <Step title="The CLI stores the session">
+    The session is saved in `~/.freeticket/config.json`, checked against `GET /me`, and your user is printed.
+  </Step>
+</Steps>
+
+The session acts with your role in each workspace. If your account reaches several workspaces, the CLI lists them and pins none. See [Workspaces](/cli/workspaces).
+
+| Option | Purpose |
+| --- | --- |
+| `--workspace <id>` | Pin this login to one workspace |
+| `--url <url>` | Use another API base URL |
+| `--json` | Print the result as JSON. The confirmation goes to stderr. |
+
+## API key (CI and automation)
+
+In a pipeline there is no browser. Use a key instead:
+
+```bash
+ft login --key ft_live_xxx
+```
+
+Or skip the config file entirely and use environment variables:
+
+```bash
+export FT_API_KEY=ft_live_xxx
+export FT_WORKSPACE_ID=<workspace-id>   # optional
+ft sales list --json
+```
+
+Create a dedicated key for each pipeline from a logged-in machine:
+
+```bash
+ft api-keys create github-actions --scope read
+ft api-keys create sync-job --scope write --expires 2027-01-01
+```
+
+The secret is printed once and never stored by FreeTicket. Keys default to `read`. See [Authentication](/guides/authentication#scopes).
+
+## Inspect and log out
+
+```bash
+ft whoami     # user, role and workspaces (GET /me)
+ft config     # API URL, masked credential, pinned workspace
+ft logout     # remove the stored credential
+```
+
+`ft logout` removes the credential from your machine. To invalidate a key on the server as well, run `ft api-keys revoke <id>`.

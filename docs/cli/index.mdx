@@ -1,0 +1,87 @@
+---
+title: Install the CLI
+description: Install ft, the official FreeTicket command-line tool, and run your first commands.
+sidebar:
+  label: Install
+---
+
+`ft` is the official FreeTicket CLI. It calls the [B2B API](/guides) and gives you your events, sales, tickets, memberships, venues, staff and reports from the terminal. Output is a readable table, or JSON and CSV for scripts.
+
+The CLI is generated from the API's OpenAPI contract, so its parameters and enums match the API.
+
+## Requirements
+
+- Node.js 20 or newer
+- A FreeTicket account with access to a workspace
+
+## Install
+
+<CodeGroup>
+
+```bash npm
+npm install -g @freeticket/cli
+```
+
+```bash pnpm
+pnpm add -g @freeticket/cli
+```
+
+```bash npx (no install)
+npx @freeticket/cli@latest whoami
+```
+
+</CodeGroup>
+
+Check the install:
+
+```bash
+ft --version
+```
+
+Run `ft` with no arguments, or `ft <command> --help`, to see what is available.
+
+## First commands
+
+```bash
+ft login                               # browser login, no key to paste
+ft whoami                              # your user and workspaces
+ft events list                         # events across your workspaces
+ft reports summary --period 30d        # KPIs for the last 30 days
+ft sales list --status CONFIRMED --json
+```
+
+## Configuration
+
+`ft` resolves settings in this order:
+
+```text
+flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
+```
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `FT_API_URL` | `https://admin.appfreeticket.com` | API base URL, without `/api/v1` |
+| `FT_API_KEY` | | An `ft_live_…` key, for CI and headless use |
+| `FT_WORKSPACE_ID` | | Default workspace id |
+| `FT_NO_UPDATE_CHECK` | | Set it to turn off the "update available" notice |
+
+`~/.freeticket/config.json` holds your session, so the CLI keeps it at `0600` permissions (readable only by you). `ft config` shows the active configuration with the credential masked.
+
+The update notice prints at most once a day, on stderr, and only in an interactive terminal.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Log in" href="/cli/login" icon="log-in">
+    Browser login, and API keys for CI.
+  </Card>
+  <Card title="Workspaces" href="/cli/workspaces" icon="building-2">
+    Read all your workspaces or pin one.
+  </Card>
+  <Card title="Command reference" href="/cli/commands" icon="list">
+    Every command, grouped by resource.
+  </Card>
+  <Card title="Scripting" href="/cli/scripting" icon="file-code">
+    JSON and CSV output, pagination and exit codes.
+  </Card>
+</CardGroup>

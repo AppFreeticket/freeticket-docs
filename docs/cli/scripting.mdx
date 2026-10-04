@@ -1,0 +1,79 @@
+---
+title: Scripting
+description: Use ft in scripts and CI with JSON and CSV output, full pagination, non-interactive deletes and exit codes.
+---
+
+## Output formats
+
+| Flag | stdout |
+| --- | --- |
+| *(none)* | A table for lists, pretty JSON for single objects |
+| `--json` | JSON. On lists, just the `data` array. |
+| `--raw` | The full `{ data, page }` envelope (lists) |
+| `--csv` | CSV (lists and reports) |
+
+Hints, confirmations and pagination tips go to **stderr**, so stdout stays clean for `jq` and pipes.
+
+```bash
+# Ids of every published event
+ft events list --status PUBLISHED --all --json | jq -r '.[].id'
+
+# Confirmed sales this month, as CSV
+ft sales list --status CONFIRMED --from 2026-10-01T00:00:00Z --all --csv > sales.csv
+
+# Total revenue from the summary report
+ft reports summary --period 30d --json | jq
+```
+
+## Pagination
+
+- `--all` fetches every page.
+- To page manually, use `--raw` to read `page.nextCursor` and pass it back with `--cursor`. Manual paging needs a single workspace (`--workspace <id>`).
+
+```bash
+ft sales list --workspace "$WS" --limit 100 --raw | jq '.page'
+```
+
+## Request bodies
+
+Write commands take `--data` with inline JSON or `@path/to/file.json`:
+
+```bash
+ft events create --data @event.json --json | jq -r '.id'
+```
+
+## Non-interactive deletes
+
+`delete` asks for confirmation. Without a terminal, for example in CI or a pipe, the prompt counts as "no" and the command stops. Pass `--yes`:
+
+```bash
+ft discounts delete "$DISCOUNT_ID" --yes
+```
+
+## Exit codes and errors
+
+- `0`: success.
+- `1`: any failure. The API error (`status`, `code`, `message`) and a hint print to stderr.
+
+| Status | Hint |
+| --- | --- |
+| `401` | Session invalid, revoked or expired. Run `ft login`. |
+| `403` | Your role or workspace doesn't allow the action |
+| `404` | Doesn't exist, or belongs to another workspace |
+| `422` | Validation failed. The invalid fields are listed. |
+| `429` | Rate limited. Retry with backoff. |
+
+## CI example (GitHub Actions)
+
+```yaml
+- name: Export yesterday's buyers
+  env:
+    FT_API_KEY: ${{ secrets.FT_API_KEY }}        # a read-scoped key
+    FT_WORKSPACE_ID: ${{ vars.FT_WORKSPACE_ID }}
+  run: |
+    npx @freeticket/cli@latest reports export buyers \
+      --from "$(date -u -d yesterday +%Y-%m-%dT00:00:00Z)" \
+      --csv > buyers.csv
+```
+
+With `FT_API_KEY` set, no `ft login` and no config file are needed. The update check is skipped automatically when stderr is not a terminal.

@@ -1,0 +1,119 @@
+---
+title: Errors, pagination and limits
+description: The response envelope, error codes, cursor pagination, rate limits, retries and idempotency shared by the FreeTicket APIs.
+sidebar:
+  label: Errors, pagination & limits
+---
+
+## Response envelope
+
+Successful responses wrap the payload in `data`:
+
+```json
+{ "data": { "id": "…", "name": "Concierto de prueba" } }
+```
+
+Lists add a `page` object. See [Pagination](#pagination). Some responses also carry a non-fatal `warnings` array that explains a surprising result. For example, an empty list may come with a warning when the key also reaches other workspaces. Clients that don't read `warnings` keep working.
+
+## Errors
+
+Every B2B error has the same shape:
+
+```json
+{
+  "error": {
+    "code": "UNPROCESSABLE_ENTITY",
+    "message": "Cuerpo o parámetros inválidos.",
+    "retryable": false,
+    "details": [{ "path": "dates.0.startsAt", "message": "…" }]
+  }
+}
+```
+
+| Field | Meaning |
+| --- | --- |
+| `code` | Stable, machine-readable code. Branch on this, not on `message`. |
+| `message` | Human-readable explanation, in Spanish. |
+| `retryable` | `true` when repeating the **same** request may succeed. Set by the server. |
+| `details` | Optional context. On `422` it lists each invalid field with its `path`. |
+
+| Status | Default `code` | When |
+| --- | --- | --- |
+| `400` | `BAD_REQUEST` | Malformed request |
+| `401` | `UNAUTHORIZED` | Missing, invalid, expired or revoked key |
+| `403` | `FORBIDDEN` | Role too low, or one of `READ_ONLY_KEY`, `ACCESS_EXPIRED`, `SECTION_FORBIDDEN` |
+| `404` | `NOT_FOUND` | Doesn't exist, **or** belongs to another workspace |
+| `409` | `CONFLICT` or a specific code | The request conflicts with the resource's state |
+| `422` | `UNPROCESSABLE_ENTITY` | Body or query failed validation |
+| `429` | `RATE_LIMITED` | Too many requests. See [Rate limits](#rate-limits). |
+| `5xx` | `INTERNAL_ERROR`, `UNAVAILABLE` | Server or upstream failure |
+
+Many `409`s carry a specific `code` that tells you what to do next. For example, `SALE_ALREADY_CHECKED_IN` when cancelling a sale whose tickets were already used at the door. Each operation lists its codes in the [reference](/reference/v1).
+
+:::tip
+A `404` on a resource you know exists usually means the request ran against a different workspace. Check the `X-Workspace-Id` header against `GET /me`.
+:::
+
+## Pagination
+
+B2B list endpoints use cursor pagination:
+
+| Query parameter | Default | Notes |
+| --- | --- | --- |
+| `limit` | `20` | 1 to 100 |
+| `cursor` | | The `nextCursor` from the previous page |
+| `withTotal` | off | `1` adds `page.total`, at the cost of an extra count |
+
+```json
+{
+  "data": [ … ],
+  "page": { "nextCursor": "clx…", "hasMore": true }
+}
+```
+
+Keep requesting with `cursor=<nextCursor>` while `hasMore` is `true`:
+
+```bash
+cursor=""
+while :; do
+  res=$(curl -s "$FT/sales?limit=100${cursor:+&cursor=$cursor}" \
+    -H "Authorization: Bearer $FT_KEY" -H "X-Workspace-Id: $WS")
+  echo "$res" | jq -c '.data[]'
+  [ "$(echo "$res" | jq -r '.page.hasMore')" = "true" ] || break
+  cursor=$(echo "$res" | jq -r '.page.nextCursor')
+done
+```
+
+A cursor only means something inside the workspace that issued it, so keep `X-Workspace-Id` fixed while you walk the pages.
+
+Export endpoints under `/reports/exports/*` return up to 5,000 rows per call. The public event catalog uses `page` and `pageSize` (up to 50) instead of cursors.
+
+## Rate limits
+
+Unauthenticated and abuse-prone endpoints are throttled, especially on the [public API](/guides/public-api): order creation is limited per IP, and ticket resend per ticket code. When you hit a limit:
+
+- The status is `429` and `error.retryable` is `true`.
+- The `Retry-After` header gives the number of seconds to wait.
+
+Honor `Retry-After`, back off exponentially on repeated `429`s, and don't retry errors where `retryable` is `false`. Those fail the same way until you change the request.
+
+## Idempotency
+
+`POST /sales` accepts an `Idempotency-Key` header of up to 255 characters, unique per workspace. If you repeat a request with the same key, you get the sale that the first attempt created instead of a second one. The replayed response is a `201` with the header `Idempotent-Replay: true`.
+
+```bash
+curl -X POST $FT/sales \
+  -H "Authorization: Bearer $FT_KEY" \
+  -H "X-Workspace-Id: $WS" \
+  -H "Idempotency-Key: order-8812" \
+  -H "Content-Type: application/json" \
+  -d @sale.json
+```
+
+Send one on every sale your client might retry, for example after a timeout. A key longer than 255 characters returns `422` rather than being silently ignored.
+
+## Dates, money and time zones
+
+- Timestamps are ISO 8601. Responses are in UTC. Send UTC (`Z`) or an explicit offset.
+- Each event date carries an IANA `timezone`, `America/Bogota` by default. Use it when you display local times.
+- Amounts are plain numbers in the resource's `currency`, usually `COP`. Don't assume cents.

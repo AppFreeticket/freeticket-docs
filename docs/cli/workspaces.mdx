@@ -1,0 +1,53 @@
+---
+title: Workspaces
+description: Read every workspace you can access at once, or pin the CLI to a single workspace.
+---
+
+By default **nothing is pinned**:
+
+- `list` commands and row-based reports read **every workspace you can access** and add `workspaceId` and `workspaceName` to each row.
+- Other commands (get, create, update…) run against your account's default workspace.
+
+```bash
+ft workspace list
+```
+
+```text
+┌────────┬──────┬────────────┬────────────┬───────┬────────┐
+│ active │ id   │ name       │ slug       │ role  │ access │
+├────────┼──────┼────────────┼────────────┼───────┼────────┤
+│ *      │ …    │ My Venue   │ my-venue   │ ADMIN │ full   │
+│        │ …    │ Tour 2026  │ tour-2026  │ STAFF │ full   │
+└────────┴──────┴────────────┴────────────┴───────┴────────┘
+```
+
+`role` is your role **in that workspace**. `access` is `full`, the list of sections you can use, or `revoked`.
+
+## Pin a workspace
+
+```bash
+ft workspace use my-venue      # by slug or id
+ft workspace show              # what is active now
+ft workspace clear             # unpin: read all workspaces again
+```
+
+Pinning stores the workspace in `~/.freeticket/config.json` and sends it as the `X-Workspace-Id` header on every request.
+
+## Override per command
+
+Every command takes `--workspace <id>`:
+
+```bash
+ft events list --workspace <workspace-id>
+ft events create --workspace <workspace-id> --data @event.json
+```
+
+## Pagination across workspaces
+
+`--cursor` only works with a single workspace, because a cursor from one workspace means nothing in another. When you read several:
+
+- `--limit` is split between the workspaces.
+- `--all` walks every page of every workspace.
+- If one workspace fails, its error goes to stderr and the others still return.
+
+To page manually, pin a workspace first (`--workspace` or `ft workspace use`).

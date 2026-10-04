@@ -1,0 +1,59 @@
+---
+title: FreeTicket for developers
+description: Build on FreeTicket, the ticketing platform for events in Colombia and Latin America. Automate your workspace over a REST API, a command-line tool, or an MCP server for AI agents.
+---
+
+FreeTicket exposes the same operations as its dashboard through three programmatic surfaces. They share one contract and one credential, so anything you prototype in one carries over to the others.
+
+<CardGroup cols={3}>
+  <Card title="REST API" href="/guides" icon="code">
+    The B2B API at `/api/v1` for your workspace, and an anonymous storefront API for buyers.
+  </Card>
+  <Card title="CLI" href="/cli" icon="terminal">
+    `ft`: log in through the browser, then list, create and export from the terminal or a script.
+  </Card>
+  <Card title="MCP server" href="/mcp" icon="sparkles">
+    Hosted at `mcp.appfreeticket.com`. Connect Claude, ChatGPT, Cursor and other MCP clients.
+  </Card>
+</CardGroup>
+
+## Which one should I use?
+
+| You want to… | Use |
+| --- | --- |
+| Integrate FreeTicket into your own backend or website | [REST API](/guides) |
+| Sell tickets from your own storefront without an account | [Public storefront API](/guides/public-api) |
+| Run one-off operations or shell scripts against your workspace | [CLI](/cli) |
+| Ask an AI assistant about your events, sales and reports | [MCP server](/mcp) |
+
+## API reference
+
+Both references are generated from the OpenAPI 3.1 contracts the platform serves, so they always match production.
+
+<CardGroup cols={2}>
+  <Card title="B2B API reference" href="/reference/v1" icon="book-open">
+    Events, dates, ticket types, sales, tickets, memberships, venues, staff, reports, settlements, discounts, webhooks and API keys.
+  </Card>
+  <Card title="Public API reference" href="/reference/public" icon="globe">
+    Anonymous event catalog, live availability, orders and ticket resend.
+  </Card>
+</CardGroup>
+
+The raw contracts are also available for code generation:
+
+- B2B: `https://admin.appfreeticket.com/api/v1/openapi.json`
+- Public: `https://appfreeticket.com/api/public/openapi.json`
+
+## Get started
+
+<Steps>
+  <Step title="Install the CLI and log in">
+    `npm install -g @freeticket/cli`, then `ft login`. Your browser opens and you approve the session. See [Install the CLI](/cli).
+  </Step>
+  <Step title="Create an API key for your integration">
+    `ft api-keys create my-integration --scope write`. See [Authentication](/guides/authentication).
+  </Step>
+  <Step title="Make your first call">
+    Follow the [quickstart](/guides/quickstart) to create an event and put it on sale.
+  </Step>
+</Steps>

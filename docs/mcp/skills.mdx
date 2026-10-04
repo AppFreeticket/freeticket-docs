@@ -1,0 +1,57 @@
+---
+title: Agent skills
+description: Install FreeTicket's open-source agent skills so your coding agent or assistant knows how to drive the CLI, the MCP server and FreeTicket's event rules.
+---
+
+Skills are Markdown files that give an AI agent focused knowledge: which command or tool to use, the product rules, and the workflows that work. FreeTicket publishes three skills, MIT-licensed, in [`AppFreeticket/agent-skills`](https://github.com/AppFreeticket/agent-skills). They follow the [Agent Skills specification](https://agentskills.io/specification).
+
+| Skill | Teaches the agent to |
+| --- | --- |
+| `freeticket-cli` | Drive `ft`: log in, read and write events, dates, ticket types, sales, plans, venues and staff, publish, cancel and refund, reconcile, and export to CSV or JSON |
+| `freeticket-mcp` | Connect to the MCP server, understand its credential layers, and choose the right tool among the catalog |
+| `freeticket-eventos` | Write and audit events with FreeTicket's rules and voice, using live data from your workspace to recommend improvements |
+
+The skill instructions are in English. Buyer-facing copy from `freeticket-eventos` is written in neutral Spanish.
+
+## Install
+
+Install one skill with [`npx skills`](https://skills.sh):
+
+```bash
+npx skills add AppFreeticket/agent-skills@freeticket-cli
+npx skills add AppFreeticket/agent-skills@freeticket-mcp
+npx skills add AppFreeticket/agent-skills@freeticket-eventos
+```
+
+List what is available:
+
+```bash
+npx skills add AppFreeticket/agent-skills -l
+```
+
+Skills install into your agent's skills directory, globally or per project. The agent reads each skill's name and description, and loads the full body only when your request matches.
+
+### Claude Code plugin
+
+The repository is also a plugin. It installs the three skills and wires the hosted MCP server, which signs you in through the browser the first time you use it:
+
+```text
+/plugin marketplace add AppFreeticket/agent-skills
+/plugin install freeticket@freeticket
+```
+
+The same manifests follow the [Agent Plugins](https://agent-plugins.org) standard, so other compatible clients can read them.
+
+### Agents without skill support
+
+For agents that read `AGENTS.md`, or chat assistants without skills, point the agent at the relevant `SKILL.md`, or paste it in as context. The CLI runs anywhere with Node.js through `npx @freeticket/cli@latest <command>`.
+
+## Example requests
+
+| You say | Skill |
+| --- | --- |
+| "List my events" / "Export buyers for Saturday" | `freeticket-cli` |
+| "Create an event and publish it" / "Refund sale X" | `freeticket-cli` |
+| "Add FreeTicket to Claude" / "Which tool refunds a sale?" | `freeticket-mcp` |
+| "Write the description for this event" | `freeticket-eventos` |
+| "Why isn't this event selling?" | `freeticket-eventos`, with live data |

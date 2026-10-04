@@ -1,0 +1,62 @@
+---
+title: MCP server
+description: The hosted FreeTicket MCP server lets AI assistants such as Claude, ChatGPT and Cursor read and operate your workspace, or help buyers find and buy tickets.
+sidebar:
+  label: Overview
+---
+
+The FreeTicket MCP server exposes the platform as [Model Context Protocol](https://modelcontextprotocol.io) tools. Connect it to an AI assistant and ask in plain language, for example "how many tickets did we sell this week?", "publish the Medellín date" or "find a concert in Bogotá this Saturday". The assistant calls the right tool for you.
+
+It is a client of the same [B2B](/guides) and [public](/guides/public-api) APIs as the CLI. Each tool maps to one API operation, with the same rules, roles and errors.
+
+## Endpoints
+
+The server is hosted. You don't need to install anything.
+
+| URL | Auth | Tools |
+| --- | --- | --- |
+| `https://mcp.appfreeticket.com/mcp` | OAuth sign-in or an API key | Public tools plus your workspace's B2B tools |
+| `https://mcp.appfreeticket.com/mcp/public` | None | Public tools only: discovery, availability and orders |
+
+Both use the Streamable HTTP transport. The server is stateless: each request carries its own credential, and nothing is stored on the server.
+
+## What you can do
+
+<CardGroup cols={2}>
+  <Card title="Operate your workspace" icon="layout-dashboard">
+    List and create events, dates and ticket types. Publish events, review and refund sales, check tickets in, and manage plans, discounts, venues and staff.
+  </Card>
+  <Card title="Analyze" icon="chart-line">
+    KPIs, sales by event, time series, inventory, financials and exports, rendered as tables and KPI tiles in clients that support MCP Apps.
+  </Card>
+  <Card title="Sell to buyers" icon="ticket">
+    Search published events, read live availability, and create orders that return a payment link for the buyer.
+  </Card>
+  <Card title="Work across workspaces" icon="layers">
+    Most list and report tools take `workspace: "all"` to aggregate every workspace you can access.
+  </Card>
+</CardGroup>
+
+## Safety
+
+- The assistant can only do what **your role** allows in the workspace.
+- Destructive tools (`*_delete`, `*_cancel`, `*_refund`) are marked destructive, so clients ask you to confirm them.
+- The assistant never handles payments. Ordering tools return a payment link that the buyer opens.
+- Tools can list API keys but not create or revoke them. Issuing credentials is left to you.
+
+## Next
+
+<CardGroup cols={2}>
+  <Card title="Connect a client" href="/mcp/connect" icon="plug">
+    Claude, Claude Code, ChatGPT, Cursor and others.
+  </Card>
+  <Card title="Credentials" href="/mcp/authentication" icon="key-round">
+    Public, API key and OAuth access.
+  </Card>
+  <Card title="Tool catalog" href="/mcp/tools" icon="wrench">
+    Every tool, grouped by domain.
+  </Card>
+  <Card title="Agent skills" href="/mcp/skills" icon="graduation-cap">
+    Teach your agent FreeTicket's workflows.
+  </Card>
+</CardGroup>
