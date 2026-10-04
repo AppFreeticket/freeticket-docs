@@ -1,6 +1,5 @@
 node_modules/
 .blume/
 dist/
-.env.local
-.vercel/
-.vercel/
+.vercel
+.env*
