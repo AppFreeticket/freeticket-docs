@@ -1,0 +1,17 @@
+/* Neon UI-style look (ui.neon.com, also Blume): near-black neutrals, hairline
+   borders, 0.5rem radius. Accent is FreeTicket yellow instead of Neon green. */
+:root {
+  --blume-accent: #8a6d00; /* darker yellow so accent text passes AA on white */
+  --blume-radius: 0.5rem;
+}
+
+:root[data-theme="dark"] {
+  --blume-background: #0c0d0d;
+  --blume-foreground: #f3f4f6;
+  --blume-muted: #131414;
+  --blume-muted-foreground: #9ca3af;
+  --blume-border: #262727;
+  --blume-accent: #ffd102;
+  --blume-accent-foreground: #0c0d0d;
+  --blume-code-background: #131414;
+}

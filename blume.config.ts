@@ -6,9 +6,16 @@ import { openapi } from "blume/reference";
 // contracts. The superadmin spec (/api/admin) is internal and stays out.
 export default defineConfig({
   title: "FreeTicket Docs",
+  logo: {
+    image: { light: "/logo-onLight.png", dark: "/logo-onDark.png", alt: "FreeTicket" },
+    text: "Docs",
+  },
   description:
     "Build on FreeTicket: the B2B REST API, the public storefront API, the ft CLI and the MCP server for AI agents.",
-  theme: { mode: "system" },
+  theme: {
+    mode: "dark",
+    fonts: { display: "inter", body: "inter", mono: "geist-mono" },
+  },
   navigation: {
     tabs: [
       { label: "Guides", path: "/guides", icon: "book" },
