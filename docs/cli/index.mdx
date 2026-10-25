@@ -1,11 +1,13 @@
 ---
 title: Install the CLI
-description: Install ft, the official FreeTicket command-line tool, and run your first commands.
+description: Install ft, the official FreeTicket CLI on npm, log in through the browser, and manage events, sales, check-in and reports from your terminal.
+seo:
+  title: Install the FreeTicket CLI (ft)
 sidebar:
   label: Install
 ---
 
-`ft` is the official FreeTicket CLI. It calls the [B2B API](/guides) and gives you your events, sales, tickets, memberships, venues, staff and reports from the terminal. Output is a readable table, or JSON and CSV for scripts.
+`ft` is the official FreeTicket CLI, published on npm as [`@freeticket/cli`](https://www.npmjs.com/package/@freeticket/cli). It calls the [B2B API](/guides) and gives you your events, sales, tickets, memberships, venues, staff, settlements and reports from the terminal. Output is a readable table, or JSON and CSV for scripts.
 
 The CLI is generated from the API's OpenAPI contract, so its parameters and enums match the API.
 
@@ -43,6 +45,7 @@ Run `ft` with no arguments, or `ft <command> --help`, to see what is available.
 ## First commands
 
 ```bash
+ft signup --email you@example.com --name "Your Name"   # only if you have no account
 ft login                               # browser login, no key to paste
 ft whoami                              # your user and workspaces
 ft events list                         # events across your workspaces
@@ -65,9 +68,9 @@ flags  >  environment variables  >  ~/.freeticket/config.json  >  defaults
 | `FT_WORKSPACE_ID` | | Default workspace id |
 | `FT_NO_UPDATE_CHECK` | | Set it to turn off the "update available" notice |
 
-`~/.freeticket/config.json` holds your session, so the CLI keeps it at `0600` permissions (readable only by you). `ft config` shows the active configuration with the credential masked.
+`~/.freeticket/config.json` holds your stored accounts and their credentials, so the CLI writes it atomically with `0600` permissions (readable only by you). `ft config` shows the active configuration with credentials masked. With `FT_API_KEY` set, the CLI uses that single key and ignores the stored accounts.
 
-The update notice prints at most once a day, on stderr, and only in an interactive terminal.
+When a newer version is on npm, `ft` prints an "update available" notice on stderr. It stays quiet with `--json`, `--raw` or `--csv`, outside an interactive terminal, in CI, and when `FT_NO_UPDATE_CHECK` is set. Update with `npm install -g @freeticket/cli@latest`.
 
 ## Next
 
@@ -75,8 +78,8 @@ The update notice prints at most once a day, on stderr, and only in an interacti
   <Card title="Log in" href="/cli/login" icon="log-in">
     Browser login, and API keys for CI.
   </Card>
-  <Card title="Workspaces" href="/cli/workspaces" icon="building-2">
-    Read all your workspaces or pin one.
+  <Card title="Workspaces and accounts" href="/cli/workspaces" icon="building-2">
+    Read all your workspaces and accounts at once, or pin one.
   </Card>
   <Card title="Command reference" href="/cli/commands" icon="list">
     Every command, grouped by resource.
