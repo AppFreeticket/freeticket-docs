@@ -1,21 +1,29 @@
 ---
 title: Agent skills
-description: Install FreeTicket's open-source agent skills so your coding agent or assistant knows how to drive the CLI, the MCP server and FreeTicket's event rules.
+description: Install FreeTicket's open-source agent skills with npx skills add. Claude Code, Cursor and Codex learn the ft CLI, the MCP tools and FreeTicket's event rules.
+seo:
+  title: FreeTicket agent skills for AI coding agents
 ---
 
 Skills are Markdown files that give an AI agent focused knowledge: which command or tool to use, the product rules, and the workflows that work. FreeTicket publishes three skills, MIT-licensed, in [`AppFreeticket/agent-skills`](https://github.com/AppFreeticket/agent-skills). They follow the [Agent Skills specification](https://agentskills.io/specification).
 
 | Skill | Teaches the agent to |
 | --- | --- |
-| `freeticket-cli` | Drive `ft`: log in, read and write events, dates, ticket types, sales, plans, venues and staff, publish, cancel and refund, reconcile, and export to CSV or JSON |
-| `freeticket-mcp` | Connect to the MCP server, understand its credential layers, and choose the right tool among the catalog |
+| `freeticket-cli` | Drive `ft`: log in, read and write events, dates, ticket types, sales, plans, venues and staff, publish or cancel events, refund and reassign tickets, reconcile, and export to CSV or JSON |
+| `freeticket-mcp` | Connect to the [MCP server](/mcp), understand its credential layers, and choose the right tool from the [catalog](/mcp/tools) |
 | `freeticket-eventos` | Write and audit events with FreeTicket's rules and voice, using live data from your workspace to recommend improvements |
 
 The skill instructions are in English. Buyer-facing copy from `freeticket-eventos` is written in neutral Spanish.
 
 ## Install
 
-Install one skill with [`npx skills`](https://skills.sh):
+Install with [`npx skills`](https://skills.sh). Without a skill name, it lets you pick from all three:
+
+```bash
+npx skills add AppFreeticket/agent-skills
+```
+
+Or install one skill directly:
 
 ```bash
 npx skills add AppFreeticket/agent-skills@freeticket-cli

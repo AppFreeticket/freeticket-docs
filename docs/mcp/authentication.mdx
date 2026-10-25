@@ -1,6 +1,8 @@
 ---
 title: Credentials
-description: The three ways to access the FreeTicket MCP server, anonymous public, OAuth sign-in and API key, and how each one picks a workspace.
+description: How to authenticate to the FreeTicket MCP server with anonymous public access, OAuth 2.1 sign-in or an API key, and how tools pick a workspace.
+seo:
+  title: "MCP authentication: OAuth 2.1 and API keys"
 ---
 
 The tools you see depend on the credential the client sends.
@@ -8,7 +10,7 @@ The tools you see depend on the credential the client sends.
 | Layer | Endpoint | Credential | Tools |
 | --- | --- | --- | --- |
 | Public (B2C) | `/mcp/public` | None | `public_*`: discovery, availability, orders, ticket resend |
-| OAuth sign-in | `/mcp` | Token issued after you sign in to FreeTicket | Public tools plus B2B tools for your workspaces |
+| OAuth 2.1 sign-in | `/mcp` | Token issued after you sign in to FreeTicket | Public tools plus B2B tools for your workspaces |
 | API key | `/mcp` | `Authorization: Bearer ft_live_xxx` | Public tools plus B2B tools for your workspaces |
 
 In every layer, B2B tools act with **your role** in the target workspace, exactly like the [API](/guides/authentication#roles).
@@ -23,24 +25,24 @@ https://mcp.appfreeticket.com/mcp/public
 
 ## OAuth sign-in
 
-This is the default for chat clients like Claude and ChatGPT, which can't send custom headers:
+The server embeds an OAuth 2.1 authorization server. This is the default for chat clients like Claude and ChatGPT, which can't send custom headers:
 
 <Steps>
   <Step title="Discovery">
-    An unauthenticated request to `/mcp` returns `401` with a `WWW-Authenticate` header that points to `/.well-known/oauth-protected-resource`. The client discovers the authorization server from there.
+    An unauthenticated request to `/mcp` returns `401` with a `WWW-Authenticate` header that points to `https://mcp.appfreeticket.com/.well-known/oauth-protected-resource` (RFC 9728). The client discovers the authorization server metadata from there (RFC 8414).
   </Step>
   <Step title="Client registration">
-    The client registers itself automatically (dynamic client registration), so there is no client ID or secret to fill in.
+    The client registers itself automatically (dynamic client registration, RFC 7591), so there is no client ID or secret to fill in.
   </Step>
   <Step title="Sign in and approve">
-    The consent page offers **Continue with FreeTicket**. You sign in with your normal account and approve, using the same device flow as `ft login`. If you belong to several workspaces, you pick one.
+    The consent page offers **Continue with FreeTicket**. You sign in with your normal account and approve, using the same device flow as `ft login`. There is no workspace to pick: the connection reaches every workspace your account does.
   </Step>
   <Step title="Token">
-    The client receives an access token and a refresh token, and renews the access token without asking you again.
+    The client receives an access token and a refresh token (authorization code with PKCE `S256`), and renews the access token without asking you again.
   </Step>
 </Steps>
 
-The consent page also has advanced options for pasting an API key by hand.
+Under **Advanced options**, the consent page also lets you paste an API key by hand, and tie the connection to a single workspace.
 
 ## API key
 
@@ -55,9 +57,10 @@ Create a dedicated key with `ft api-keys create mcp-agent --scope read` (or `--s
 
 ## Choosing the workspace
 
-- Without a workspace selection, tools run against your default workspace, or the one you picked during OAuth sign-in.
-- With an API key, `X-Workspace-Id` sets the workspace for the whole connection.
-- List and report tools accept a `workspace` argument: `"all"` aggregates every workspace you can access, and an array of ids aggregates only those. Each row is tagged with `workspaceId` and `workspaceName`.
+- By default nothing is pinned. List and row-based report tools read **every workspace your credential reaches** and tag each row with `workspaceId` and `workspaceName`.
+- Pass `workspace: ["<id>", …]` to narrow a list to some workspaces, or to one when you need to page deep. `"all"` is the same as leaving it out.
+- Tools that act on one resource (get, create, update, delete…) run against your account's default workspace unless the connection is pinned.
+- To pin the whole connection, send `X-Workspace-Id` with an API key, or fill in the workspace under **Advanced options** during OAuth sign-in.
 
 Call the `whoami` tool to see your user, your workspaces and your role in each.
 

@@ -1,9 +1,11 @@
 ---
 title: Tool catalog
-description: Every FreeTicket MCP tool grouped by domain, with the API operation it calls.
+description: "Every FreeTicket MCP tool for AI agents, by domain: events, ticket types, sales, refunds, check-in, memberships, reports, settlements and public ordering."
+seo:
+  title: FreeTicket MCP tool catalog
 ---
 
-Each tool calls one API operation and returns what the API returns. Roles, validation and errors are the same as in the [B2B API reference](/reference/v1). Tools marked **destructive** ask for confirmation in clients that support it.
+The hosted server exposes 94 tools: 6 public tools and 88 workspace tools. Each tool calls one API operation and returns what the API returns. Roles, validation and errors are the same as in the [B2B API reference](/reference/v1). Tools marked **destructive** ask for confirmation in clients that support it.
 
 ## Public (no credential)
 
@@ -25,6 +27,7 @@ Public ordering covers general admission tickets that are not members-only.
 | Tool | Does |
 | --- | --- |
 | `whoami` | Your user, your workspaces and your role in each |
+| `workspaces_create` | Create your own workspace. You become its `ADMIN`. |
 
 ## Events and dates
 
@@ -33,7 +36,8 @@ Public ordering covers general admission tickets that are not members-only.
 | `events_list` · `events_get` | List events (filters: `q`, `status`) or get one |
 | `events_create` | Create an event with its dates |
 | `events_update` · `events_publish` | Edit an event, or publish a draft |
-| `events_delete` | Delete an event. **Destructive.** |
+| `events_cancel` | Cancel an event and all its dates, keeping its sales and tickets. **Destructive.** |
+| `events_delete` | Delete an event with no paid sales. **Destructive.** |
 | `event_dates_list` · `event_dates_create` · `event_dates_update` | Dates of an event |
 | `event_dates_delete` | Delete a date. **Destructive.** |
 
@@ -47,6 +51,7 @@ Public ordering covers general admission tickets that are not members-only.
 | `tickets_access` | Check a ticket by its code, without admitting it |
 | `tickets_checkin` | Admit a ticket at the door |
 | `tickets_resend` | Resend a ticket email |
+| `tickets_reassign` | Move a sold ticket to another date or ticket type, for a postponement |
 
 ## Sales
 
@@ -54,8 +59,9 @@ Public ordering covers general admission tickets that are not members-only.
 | --- | --- |
 | `sales_list` · `sales_get` | List sales with filters, or get one with its items |
 | `sales_tickets` | Individual tickets and attendees of a sale |
+| `sales_attempts` | Payment attempt history: why a sale didn't go through |
 | `sales_create` | Record a comp or direct sale |
-| `sales_cancel` · `sales_refund` | Cancel or refund a sale. **Destructive.** |
+| `sales_cancel` · `sales_refund` | Cancel a sale, or refund it whole or by ticket. **Destructive.** |
 
 ## Memberships
 
@@ -71,10 +77,11 @@ Public ordering covers general admission tickets that are not members-only.
 | --- | --- |
 | `venues_list` · `venues_get` · `venues_create` · `venues_update` | Venues |
 | `venues_delete` | Delete a venue. **Destructive.** |
-| `staff_list` · `staff_create` · `staff_update_role` | Staff with access to the workspace |
+| `staff_list` · `staff_get` · `staff_create` · `staff_update_role` | Staff with access to the workspace |
+| `staff_delete` | Revoke someone's access to the workspace. **Destructive.** |
 | `discounts_list` · `discounts_create` · `discounts_update` | Discount codes |
 | `discounts_delete` | Delete a discount code. **Destructive.** |
-| `webhooks_list` · `webhooks_create` | Webhook endpoints. See [Webhooks](/guides/webhooks). |
+| `webhooks_list` · `webhooks_create` · `webhooks_update` | Webhook endpoints. See [Webhooks](/guides/webhooks). |
 | `webhooks_delete` | Delete a webhook. **Destructive.** |
 
 ## Reports and exports
@@ -93,7 +100,7 @@ Public ordering covers general admission tickets that are not members-only.
 
 | Tool | Does |
 | --- | --- |
-| `settlements_list` | Payouts from FreeTicket to the organizer |
+| `settlements_list` · `settlements_get` | Payouts from FreeTicket to the organizer |
 | `settlements_document` · `settlements_proof` | A signed download link for the settlement PDF or a payment proof, valid for 5 minutes |
 
 ## Content
@@ -101,6 +108,7 @@ Public ordering covers general admission tickets that are not members-only.
 | Tool | Does |
 | --- | --- |
 | `content_videos` · `content_posts` · `content_lives` · `content_live_get` | Published videos, community posts and live streams |
+| `content_posts_create` | Publish a community post or an article |
 | `content_playback_token` | Signed playback token: 1 hour for video, 30 minutes for live. Members-only content also needs a buyer session. |
 
 ## Credentials
@@ -113,7 +121,11 @@ Creating and revoking keys is not available as a tool. Use the [CLI](/cli/comman
 
 ## Members area (enterprise)
 
-`customer_me`, `customer_tickets`, `customer_ticket_get`, `customer_membership`, `customer_profile`, `customer_profile_update`, `customer_subscribe`, `customer_subscription_cancel`, `customer_ticket_cancel` and `customer_logout` act on behalf of a signed-in buyer. They require an enterprise service API key plus the buyer's session token. See [Credentials](/mcp/authentication#buyer-sessions).
+`customer_me`, `customer_tickets`, `customer_ticket_get`, `customer_membership`, `customer_profile`, `customer_profile_update`, `customer_order_pending`, `customer_order_get`, `customer_order_release`, `customer_subscribe`, `customer_subscription_cancel`, `customer_ticket_cancel` and `customer_logout` act on behalf of a signed-in buyer. They require an enterprise service API key plus the buyer's session token. See [Credentials](/mcp/authentication#buyer-sessions).
+
+## Platform staff
+
+A separate set of `admin_*` tools manages the platform itself. They appear only for FreeTicket staff credentials and are not available to workspace accounts.
 
 ## Rendered results
 
@@ -121,9 +133,9 @@ In clients that support the MCP Apps extension, list and report tools render as 
 
 ## Global mode
 
-Most list and report tools accept `workspace`:
+Unless the connection is pinned to one workspace, list and row-based report tools read **every workspace you can access**. Their `workspace` argument narrows that:
 
-- `"all"`: aggregate every workspace you can access.
-- `["id1", "id2"]`: aggregate only those workspaces.
+- Leave it out, or pass `"all"`: every workspace you can access.
+- `["id1", "id2"]`: only those workspaces. An id you can't reach comes back as an error for that id instead of being dropped silently.
 
-Rows are tagged with `workspaceId` and `workspaceName`. `reports_summary` returns KPIs for one workspace only, because KPIs can't be added up across workspaces.
+Rows are tagged with `workspaceId` and `workspaceName`. Aggregated results carry no pagination cursor, so name one workspace to page deep. A workspace that fails is reported while the others still return. `reports_summary` returns KPIs for one workspace only, because KPIs can't be added up across workspaces.

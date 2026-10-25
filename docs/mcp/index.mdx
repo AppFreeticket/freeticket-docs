@@ -1,13 +1,15 @@
 ---
 title: MCP server
-description: The hosted FreeTicket MCP server lets AI assistants such as Claude, ChatGPT and Cursor read and operate your workspace, or help buyers find and buy tickets.
+description: The hosted FreeTicket MCP server for AI agents. Claude, ChatGPT and Cursor can operate events, sales and reports, or help buyers find tickets.
+seo:
+  title: FreeTicket MCP server for AI agents
 sidebar:
   label: Overview
 ---
 
-The FreeTicket MCP server exposes the platform as [Model Context Protocol](https://modelcontextprotocol.io) tools. Connect it to an AI assistant and ask in plain language, for example "how many tickets did we sell this week?", "publish the Medellín date" or "find a concert in Bogotá this Saturday". The assistant calls the right tool for you.
+The FreeTicket MCP server is the official [Model Context Protocol](https://modelcontextprotocol.io) server for FreeTicket, a ticketing platform for live events in Colombia and Latin America. It exposes the platform as tools, so an AI assistant can answer "how many tickets did we sell this week?", "publish the Medellín date" or "find a concert in Bogotá this Saturday" by calling the right tool for you.
 
-It is a client of the same [B2B](/guides) and [public](/guides/public-api) APIs as the CLI. Each tool maps to one API operation, with the same rules, roles and errors.
+It is a client of the same [B2B](/guides) and [public](/guides/public-api) APIs as the [CLI](/cli). Each tool maps to one API operation, with the same rules, roles and errors. Sign-in is OAuth 2.1 in the browser, so there is no key to paste.
 
 ## Endpoints
 
@@ -15,25 +17,25 @@ The server is hosted. You don't need to install anything.
 
 | URL | Auth | Tools |
 | --- | --- | --- |
-| `https://mcp.appfreeticket.com/mcp` | OAuth sign-in or an API key | Public tools plus your workspace's B2B tools |
+| `https://mcp.appfreeticket.com/mcp` | OAuth 2.1 sign-in or an API key | Public tools plus B2B tools for your workspaces |
 | `https://mcp.appfreeticket.com/mcp/public` | None | Public tools only: discovery, availability and orders |
 
-Both use the Streamable HTTP transport. The server is stateless: each request carries its own credential, and nothing is stored on the server.
+Both use the Streamable HTTP transport. The server is stateless: each request carries its own credential (an API key, or an OAuth token that seals one), and the server keeps no database. The manifest is published at `https://appfreeticket.com/.well-known/mcp.json`.
 
 ## What you can do
 
 <CardGroup cols={2}>
   <Card title="Operate your workspace" icon="layout-dashboard">
-    List and create events, dates and ticket types. Publish events, review and refund sales, check tickets in, and manage plans, discounts, venues and staff.
+    Create and publish events, dates and ticket types, cancel or postpone them, review and refund sales, check tickets in, and manage plans, discounts, venues, staff and webhooks.
   </Card>
   <Card title="Analyze" icon="chart-line">
-    KPIs, sales by event, time series, inventory, financials and exports, rendered as tables and KPI tiles in clients that support MCP Apps.
+    KPIs, sales by event, time series, inventory, financials, reconciliation, settlements and exports, rendered as tables and KPI tiles in clients that support MCP Apps.
   </Card>
   <Card title="Sell to buyers" icon="ticket">
     Search published events, read live availability, and create orders that return a payment link for the buyer.
   </Card>
   <Card title="Work across workspaces" icon="layers">
-    Most list and report tools take `workspace: "all"` to aggregate every workspace you can access.
+    One connection reaches every workspace on your account. List and report tools aggregate all of them by default.
   </Card>
 </CardGroup>
 
@@ -43,6 +45,7 @@ Both use the Streamable HTTP transport. The server is stateless: each request ca
 - Destructive tools (`*_delete`, `*_cancel`, `*_refund`) are marked destructive, so clients ask you to confirm them.
 - The assistant never handles payments. Ordering tools return a payment link that the buyer opens.
 - Tools can list API keys but not create or revoke them. Issuing credentials is left to you.
+- For analysis-only agents, connect with a `read`-scoped API key so write tools fail instead of acting.
 
 ## Next
 
@@ -57,6 +60,6 @@ Both use the Streamable HTTP transport. The server is stateless: each request ca
     Every tool, grouped by domain.
   </Card>
   <Card title="Agent skills" href="/mcp/skills" icon="graduation-cap">
-    Teach your agent FreeTicket's workflows.
+    Teach your agent FreeTicket's workflows: `npx skills add AppFreeticket/agent-skills`.
   </Card>
 </CardGroup>
