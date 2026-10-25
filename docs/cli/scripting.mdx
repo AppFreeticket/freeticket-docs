@@ -1,6 +1,8 @@
 ---
 title: Scripting
-description: Use ft in scripts and CI with JSON and CSV output, full pagination, non-interactive deletes and exit codes.
+description: Automate FreeTicket with the ft CLI in scripts and CI. JSON and CSV output for jq and spreadsheets, full pagination, exit codes and a GitHub Actions example.
+seo:
+  title: "Scripting the CLI: JSON, CSV and CI"
 ---
 
 ## Output formats
@@ -44,7 +46,7 @@ ft events create --data @event.json --json | jq -r '.id'
 
 ## Non-interactive deletes
 
-`delete` asks for confirmation. Without a terminal, for example in CI or a pipe, the prompt counts as "no" and the command stops. Pass `--yes`:
+`delete`, `events cancel` and `api-keys revoke` ask for confirmation. Without a terminal, for example in CI or a pipe, the command fails with exit code `1` and points at `--yes`, so `ft … delete && next-step` never runs `next-step` by mistake. Pass `--yes`:
 
 ```bash
 ft discounts delete "$DISCOUNT_ID" --yes
@@ -53,7 +55,7 @@ ft discounts delete "$DISCOUNT_ID" --yes
 ## Exit codes and errors
 
 - `0`: success.
-- `1`: any failure. The API error (`status`, `code`, `message`) and a hint print to stderr.
+- `1`: any failure, including a refused confirmation, or every workspace or account failing on a multi-workspace list. The API error (`status`, `code`, `message`) and a hint print to stderr.
 
 | Status | Hint |
 | --- | --- |
@@ -76,4 +78,6 @@ ft discounts delete "$DISCOUNT_ID" --yes
       --csv > buyers.csv
 ```
 
-With `FT_API_KEY` set, no `ft login` and no config file are needed. The update check is skipped automatically when stderr is not a terminal.
+With `FT_API_KEY` set, no `ft login` and no config file are needed, and the CLI ignores any accounts stored on the runner. The update notice is skipped automatically in CI.
+
+Empty `--csv` results keep their header row when the columns are known, so a zero-row export still has its columns.

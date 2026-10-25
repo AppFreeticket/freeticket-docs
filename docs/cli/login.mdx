@@ -1,6 +1,8 @@
 ---
 title: Log in
-description: Authenticate ft through the browser with the device flow, or with an API key in CI.
+description: Log in to the FreeTicket CLI through the browser with the OAuth device flow, store several accounts side by side, or use an API key in CI.
+seo:
+  title: "CLI login: device flow, accounts and API keys"
 ---
 
 ## Browser login (device flow)
@@ -26,18 +28,45 @@ The CLI uses the OAuth 2.0 Device Authorization Grant (RFC 8628), the same flow 
   <Step title="You approve in the browser">
     Sign in to FreeTicket as usual, check that the code matches, and approve. The code is valid for 10 minutes.
   </Step>
-  <Step title="The CLI stores the session">
-    The session is saved in `~/.freeticket/config.json`, checked against `GET /me`, and your user is printed.
+  <Step title="The CLI stores the account">
+    The CLI receives a `write` API key named "FreeTicket CLI", checks it against `GET /me`, saves it in `~/.freeticket/config.json` and prints your user.
   </Step>
 </Steps>
 
-The session acts with your role in each workspace. If your account reaches several workspaces, the CLI lists them and pins none. See [Workspaces](/cli/workspaces).
+The key acts with your role in each workspace. A login pins no workspace: list commands read every workspace you can access. See [Workspaces and accounts](/cli/workspaces).
 
 | Option | Purpose |
 | --- | --- |
+| `--account <name>` | Store this login under a name. Defaults to the account's email. A login with the same name replaces it. |
 | `--workspace <id>` | Pin this login to one workspace |
 | `--url <url>` | Use another API base URL |
 | `--json` | Print the result as JSON. The confirmation goes to stderr. |
+
+## No account yet
+
+Create one from the terminal, then verify your email and log in:
+
+```bash
+ft signup --email you@example.com --name "Your Name" --workspace-name "My Venue"
+ft login
+```
+
+`--workspace-name` is optional and creates your first workspace on the free plan. Without it, create one after logging in with `ft workspace create --name "My Venue" --slug my-venue`.
+
+## Several accounts
+
+Each `ft login` **adds** an account instead of replacing the previous one, so you can keep, for example, your own organization and an agency login on the same machine:
+
+```bash
+ft login                          # stored as your email
+ft login --account agency         # a second FreeTicket login
+ft account list                   # stored accounts, the pinned one marked
+ft account use agency             # pin every command to one account
+ft account clear                  # unpin: read every account again
+ft account remove agency          # same as ft logout --account agency
+```
+
+With nothing pinned, list commands and row-based reports read every account and every workspace it reaches. Commands that act on one resource (`get`, `create`, `update`, `delete`, `tickets checkin`, `reports summary`…) need exactly one account: with several stored and none chosen, they stop and name them. Pass `--account <name>` to any command to choose.
 
 ## API key (CI and automation)
 
@@ -55,6 +84,8 @@ export FT_WORKSPACE_ID=<workspace-id>   # optional
 ft sales list --json
 ```
 
+`FT_API_KEY` takes precedence over the stored accounts and counts as a single account, so a CI job never fans out across logins stored on the machine. Combining it with `--account` is an error.
+
 Create a dedicated key for each pipeline from a logged-in machine:
 
 ```bash
@@ -67,9 +98,10 @@ The secret is printed once and never stored by FreeTicket. Keys default to `read
 ## Inspect and log out
 
 ```bash
-ft whoami     # user, role and workspaces (GET /me)
-ft config     # API URL, masked credential, pinned workspace
-ft logout     # remove the stored credential
+ft whoami          # user, workspaces and role in each, for every account (GET /me)
+ft config          # API URL, masked credentials, pinned account and workspace
+ft logout          # remove the pinned (or only) account
+ft logout --all    # remove every stored account
 ```
 
-`ft logout` removes the credential from your machine. To invalidate a key on the server as well, run `ft api-keys revoke <id>`.
+`ft logout` removes the credential from your machine. To invalidate the key on the server as well, find it with `ft api-keys list` and run `ft api-keys revoke <id>`.

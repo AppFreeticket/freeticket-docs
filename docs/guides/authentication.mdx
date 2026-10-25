@@ -1,6 +1,8 @@
 ---
 title: Authentication
-description: Authenticate to the B2B API with an organization-scoped API key, choose a scope, and select the workspace you operate on.
+description: Get a FreeTicket API key with ft login or the API, pick read or write scope, understand roles, and choose the workspace with X-Workspace-Id.
+seo:
+  title: "API authentication: keys, scopes and workspaces"
 ---
 
 Every `/api/v1` request is authenticated with an **API key**. A key belongs to a user and acts with that user's role in the workspace it targets. It never grants more than the user has in the dashboard.
@@ -9,7 +11,13 @@ Keys start with `ft_live_`. FreeTicket stores only a hash, so the secret is show
 
 ## Get a key
 
-There are two ways to get a key. Both need a FreeTicket account with access to at least one workspace.
+Getting a key is self-serve. You need a FreeTicket account. To create one from the terminal:
+
+```bash
+ft signup --email ana@example.com --name "Ana Gómez" --workspace-name "My Venue"
+```
+
+This calls `POST /auth/signup`, which creates the account and sends a verification email. No credential is issued until you verify. `--workspace-name` is optional and also creates your first workspace on the free plan. Once verified, get a key in one of these ways:
 
 <Tabs>
   <Tab title="With the CLI (recommended)">
@@ -20,7 +28,7 @@ ft login                                   # approve in the browser
 ft api-keys create my-integration --scope write
 ```
 
-`ft login` uses the OAuth 2.0 device flow: it prints a short code, opens your browser, and you approve the session where you are already signed in. Then `ft api-keys create` mints a dedicated key for your integration and prints the secret once.
+`ft login` uses the OAuth 2.0 Device Authorization Grant (RFC 8628, `POST /auth/device/code` and `POST /auth/device/token`). It prints a short code, opens `https://admin.appfreeticket.com/device`, and you approve where you are already signed in. The CLI then receives its own `write` key, named "FreeTicket CLI". Next, `ft api-keys create` mints a dedicated key for your integration and prints the secret once. See [Log in](/cli/login).
 
 Optional: `--expires 2027-01-01` sets an expiry date.
 
@@ -36,12 +44,16 @@ curl -X POST https://admin.appfreeticket.com/api/v1/api-keys \
   -d '{"name": "my-integration", "scope": "write"}'
 ```
 
-The plaintext key is only in this response. Creating keys requires the `ADMIN` role.
+The plaintext key is only in this response. `scope` defaults to `read`, and `expiresAt` (ISO 8601, UTC) is optional. Creating keys requires the `ADMIN` role.
 
   </Tab>
 </Tabs>
 
-List and revoke keys with `ft api-keys list` and `ft api-keys revoke <id>`, or `GET /api-keys` and `DELETE /api-keys/{id}`.
+List and revoke keys with `ft api-keys list` and `ft api-keys revoke <id>`, or `GET /api-keys` and `DELETE /api-keys/{id}`. Listing never returns secrets, only `keyPrefix`, `scope`, `lastUsedAt`, `expiresAt` and `revokedAt`.
+
+If your account has no workspace yet, `GET /me` returns `activeWorkspaceId: null` and an empty `workspaces` list. Create one with `ft workspace create --name "My Venue" --slug my-venue` or `POST /workspaces`. You become its `ADMIN`. If you already collaborate on someone else's workspace, this returns `409 ALREADY_HAS_ACCESS`: ask that workspace's administrator to add you instead.
+
+There is no sandbox environment. Test against a dedicated workspace, with `read` keys where you can.
 
 :::tip
 Use one key per integration. You can then revoke a single integration without breaking the others.
@@ -72,7 +84,9 @@ Each key has one scope:
 | `read` | `GET` and `HEAD` only |
 | `write` | Reads, plus create, update, delete, publish, cancel, refund and check-in |
 
-A `read` key that calls a mutating method gets `403` with the code `READ_ONLY_KEY`. Keys created with `POST /api-keys` or `ft api-keys create` default to `read`. The session that `ft login` stores in the CLI can write.
+A `read` key that calls a mutating method gets `403` with the code `READ_ONLY_KEY`. Keys created with `POST /api-keys` or `ft api-keys create` default to `read`. The key that `ft login` stores in the CLI can write.
+
+A key can also be restricted to a subset of the workspace's events. Such a key only reads and writes those events and what derives from them (dates, ticket types, sales, reports). Anything else returns `403 EVENT_SCOPE_FORBIDDEN`, and the key can't manage API keys.
 
 The scopes are also published in machine-readable form at `https://admin.appfreeticket.com/.well-known/oauth-protected-resource` (RFC 9728).
 
@@ -126,8 +140,14 @@ In each workspace row, `sections: null` means unrestricted access and `[]` means
 `X-Workspace-Id` takes a workspace **id**, not a slug. An id the key can't reach is ignored, and the request falls back to the default workspace. Read ids from `GET /me` rather than hard-coding them.
 :::
 
+## Revoke access
+
+- To revoke one integration, revoke its key. To log a machine out of the CLI, run `ft logout`, then revoke its "FreeTicket CLI" key.
+- To remove a person from a workspace, an `ADMIN` calls `DELETE /staff/{id}` (`ft staff delete <id>`). This ends their sessions in that workspace without deleting their account.
+
 ## Keep keys safe
 
 - Keep keys server-side. Never ship them in a browser bundle or a mobile app. For buyer-facing flows, use the [public storefront API](/guides/public-api), which needs no key.
 - Prefer `read` keys for dashboards, reporting and BI.
 - Set an expiry on keys for temporary work, and revoke the keys you no longer use.
+- For AI assistants, prefer the [MCP server's OAuth sign-in](/mcp/authentication) over pasting a key into a chat.

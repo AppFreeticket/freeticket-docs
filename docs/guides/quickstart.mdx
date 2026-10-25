@@ -1,13 +1,15 @@
 ---
 title: "Quickstart: create an event and sell tickets"
-description: Create a venue, an event, a date and a ticket type over the B2B API, publish the event, sell tickets through the public API, and track the sales.
+description: Step-by-step FreeTicket API tutorial with curl. Create a venue, event and ticket type, publish, sell tickets, track sales and check tickets in.
+seo:
+  title: "API quickstart: create an event and sell tickets"
 sidebar:
   label: Quickstart
 ---
 
 This guide goes through the full lifecycle with `curl`. Each step uses an id returned by the step before it. The same calls are available as [CLI commands](/cli/commands) and [MCP tools](/mcp/tools).
 
-You need a key with `write` scope and the `ADMIN` role in the target workspace. See [Authentication](/guides/authentication).
+You need a key with `write` scope and the `ADMIN` role in the target workspace. See [Authentication](/guides/authentication). There is no sandbox, so run this against a workspace you use for testing.
 
 ```bash
 export FT=https://admin.appfreeticket.com/api/v1
@@ -176,6 +178,18 @@ Door staff only need the `STAFF` role.
   </Step>
 </Steps>
 
+## When plans change
+
+| Situation | Call | CLI |
+| --- | --- | --- |
+| Call off the event, keeping its sales and tickets | `POST /events/{id}/cancel` | `ft events cancel <id>` |
+| Remove a draft or an event with no paid sales | `DELETE /events/{id}` (`409 EVENT_HAS_SALES` otherwise) | `ft events delete <id>` |
+| Postpone: move a sold ticket to another date or ticket type | `PATCH /tickets/{ticketCode}` with `eventDateId` and/or `ticketTypeId` | `ft tickets reassign <code> --data <json>` |
+| Refund a whole sale, or some of its tickets | `POST /sales/{id}/refund`, with optional `items` | `ft sales refund <id> --data <json>` |
+| Find out why a sale didn't go through | `GET /sales/{id}/attempts` | `ft sales attempts <id>` |
+
+Cancelling an event doesn't refund anyone. Refund each sale separately. A reassigned ticket keeps its ticket code and original price, and the buyer isn't notified until you resend it with `POST /tickets/{ticketCode}/resend`. Whether a refund returns the money automatically depends on the payment method. The [refund operation](/reference/v1) describes each case.
+
 ## The same flow from the CLI
 
 ```bash
@@ -192,4 +206,5 @@ ft tickets checkin <ticket-code>
 
 - [Errors, pagination and limits](/guides/conventions): handle failures and walk long lists.
 - [Webhooks](/guides/webhooks): register for sale events.
+- [MCP server](/mcp): run the same flow by asking an AI assistant.
 - [B2B API reference](/reference/v1): every field of every operation.
