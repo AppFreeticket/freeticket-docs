@@ -1,6 +1,8 @@
 ---
 title: Public storefront API
-description: Browse published events, read live availability and create orders that hand the buyer a payment link, all without an API key.
+description: Sell FreeTicket events from your own site, chatbot or AI agent. Search events, read live availability and create orders with a payment link, no API key.
+seo:
+  title: "Public storefront API: events and orders"
 ---
 
 The public API is built for buyers and their agents: a custom storefront, a chatbot, or an AI assistant that helps someone find and buy tickets. It is **anonymous**, read-mostly, and isolated from the B2B API.
@@ -33,7 +35,7 @@ Your integration never handles card data. `POST /orders` returns a payment link,
 curl -s "https://appfreeticket.com/api/public/events?q=concierto&city=Bogotá&sort=date_asc"
 ```
 
-Filters: `q`, `city`, `from` and `to` (ISO 8601), `page`, `pageSize` (up to 50), and `sort` (`date_asc`, `price_asc`, `price_desc`). Each result has a `slug`.
+Filters: `q`, `city`, `from` and `to` (ISO 8601), `page`, `pageSize` (default 20, up to 50), and `sort` (`date_asc`, `price_asc`, `price_desc`). Each result has a `slug`, its next date, and two "from" prices: `priceFrom` (base) and `buyerTotalFrom` (what the buyer pays for one unit). The catalog is cache-friendly and holds no personal data.
 
   </Step>
   <Step title="Check availability">
@@ -63,7 +65,7 @@ curl -s -X POST https://appfreeticket.com/api/public/orders \
   }'
 ```
 
-The response returns `orderId`, `status: "pending"`, the authoritative `total`, a `checkoutUrl` and `expiresAt`. The stock is held for the buyer until `expiresAt`.
+The response returns `orderId`, `reference`, `status: "pending"`, the authoritative `total` and `currency`, a `checkoutUrl` and `expiresAt`. The stock is held for the buyer until `expiresAt`: 30 minutes unless the organizer configured another window, and never less than 10. Products bundled with a ticket, such as a drink combo, are added automatically and already included in `total`.
 
   </Step>
   <Step title="Send the buyer to pay">
@@ -94,19 +96,19 @@ curl -s https://appfreeticket.com/api/public/orders/<orderId>
 | `NOT_AVAILABLE` | The event or date is not published, or already took place |
 | `EXTERNAL_SALE` | The event sells on another site |
 | `SALE_CLOSED` | Outside the sales window |
-| `QUEUE_REQUIRED` | The date sells through a virtual waiting room. Send the buyer to `details.waitingRoomUrl` exactly as given. |
+| `QUEUE_REQUIRED` | The date sells through a virtual waiting room. Send the buyer to `details.waitingRoomUrl`, an absolute URL, exactly as given. |
 | `MULTIPLE_ORGS` | The items belong to different organizers |
 | `MIXED_CURRENCY` | The items use different currencies |
 | `SEAT_NOT_AVAILABLE` | A requested seat is already sold or held |
 | `ADDON_SOLD_OUT` | A product bundled with the ticket sold out |
 
-Order creation is rate-limited per IP. On `429`, wait for the number of seconds in `Retry-After`. See [Rate limits](/guides/conventions#rate-limits).
+Order creation is rate-limited per IP, and every response carries `RateLimit-Policy` and `RateLimit` headers. On `429`, wait for the number of seconds in `Retry-After`. See [Rate limits](/guides/conventions#rate-limits).
 
 ## Numbered seats
 
 For ticket types with assigned seating, availability includes `availableSeats`: the exact label of each free seat. Pass one label per unit in `items[].seats`.
 
-Orders with seats also require a **buyer session**. Send it in the `X-Customer-Session` header, or the browser sends the `ft-customer` cookie. Without a session, the API returns `401 CUSTOMER_SESSION_REQUIRED`. General admission orders stay anonymous.
+Orders with seats also require a **buyer session**. Send it in the `X-Customer-Session` header, or the browser sends the `ft-customer` cookie. Without a session, the API returns `401 CUSTOMER_SESSION_REQUIRED`. Seats are held with the same expiry as the stock and released if the order isn't paid. Orders with seats are linked to the buyer's account. General admission orders stay anonymous.
 
 ## Resend tickets
 
@@ -116,10 +118,13 @@ curl -s -X POST https://appfreeticket.com/api/public/tickets/<ticket-code>/resen
   -d '{ "email": "laura@example.com" }'
 ```
 
-This resends the ticket email to the address used in the purchase. The optional `email` must match it. The response shows the address masked. Limited to one resend per minute per ticket code.
+This resends the ticket email to the address used in the purchase. The optional `email` must match it. If the ticket was transferred, only that ticket is resent, to its current holder. The response shows the address masked. Limited to one resend per minute per ticket code.
 
 ## Scope
 
 - Only published events with an upcoming date are listed.
 - Members-only tickets can't be ordered here.
 - One order can't mix organizers or currencies.
+- The payment is always completed by a person on FreeTicket's checkout. An agent finds the event and hands over the link.
+
+AI agents can use these same operations as `public_*` tools on the [MCP server](/mcp/tools#public-no-credential), with no account.

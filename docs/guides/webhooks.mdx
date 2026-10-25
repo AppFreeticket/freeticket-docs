@@ -1,6 +1,8 @@
 ---
 title: Webhooks
-description: Register HTTPS endpoints for sale events in your workspace and verify the HMAC-SHA256 signature on each delivery.
+description: Register FreeTicket webhook endpoints for sale.confirmed events, verify the X-FreeTicket-Signature HMAC-SHA256 header, and reconcile against the API.
+seo:
+  title: "Webhooks: sale events and signature verification"
 ---
 
 A webhook is an HTTPS endpoint in your system that FreeTicket calls when something happens in your workspace. Managing webhooks requires the `ADMIN` role.
@@ -38,6 +40,7 @@ With the CLI:
 ```bash
 ft webhooks create --data '{"url":"https://example.com/hooks/freeticket","events":["sale.confirmed"]}'
 ft webhooks list
+ft webhooks update <id> --data '{"active":false}'
 ft webhooks delete <id>
 ```
 

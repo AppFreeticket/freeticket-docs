@@ -1,6 +1,8 @@
 ---
 title: Errors, pagination and limits
-description: The response envelope, error codes, cursor pagination, rate limits, retries and idempotency shared by the FreeTicket APIs.
+description: The FreeTicket API response envelope, JSON error codes, cursor pagination, 429 rate limits with RateLimit headers, versioning and idempotent retries.
+seo:
+  title: API errors, rate limits and versioning
 sidebar:
   label: Errors, pagination & limits
 ---
@@ -17,7 +19,7 @@ Lists add a `page` object. See [Pagination](#pagination). Some responses also ca
 
 ## Errors
 
-Every B2B error has the same shape:
+Every error from `/api/v1` and `/api/public` is JSON with the same shape, never an HTML page:
 
 ```json
 {
@@ -41,14 +43,14 @@ Every B2B error has the same shape:
 | --- | --- | --- |
 | `400` | `BAD_REQUEST` | Malformed request |
 | `401` | `UNAUTHORIZED` | Missing, invalid, expired or revoked key |
-| `403` | `FORBIDDEN` | Role too low, or one of `READ_ONLY_KEY`, `ACCESS_EXPIRED`, `SECTION_FORBIDDEN` |
+| `403` | `FORBIDDEN` | Role too low, or one of `READ_ONLY_KEY`, `ACCESS_EXPIRED`, `SECTION_FORBIDDEN`, `EVENT_SCOPE_FORBIDDEN` |
 | `404` | `NOT_FOUND` | Doesn't exist, **or** belongs to another workspace |
 | `409` | `CONFLICT` or a specific code | The request conflicts with the resource's state |
 | `422` | `UNPROCESSABLE_ENTITY` | Body or query failed validation |
 | `429` | `RATE_LIMITED` | Too many requests. See [Rate limits](#rate-limits). |
 | `5xx` | `INTERNAL_ERROR`, `UNAVAILABLE` | Server or upstream failure |
 
-Many `409`s carry a specific `code` that tells you what to do next. For example, `SALE_ALREADY_CHECKED_IN` when cancelling a sale whose tickets were already used at the door. Each operation lists its codes in the [reference](/reference/v1).
+Many `409`s carry a specific `code` that tells you what to do next. For example, `SALE_ALREADY_CHECKED_IN` when cancelling a sale whose tickets were already used at the door, or `EVENT_HAS_SALES` when deleting an event that has paid sales (cancel it with `POST /events/{id}/cancel` instead). Each operation lists its codes in the [reference](/reference/v1). New codes can appear in a minor version, so treat an unknown `code` like its status.
 
 :::tip
 A `404` on a resource you know exists usually means the request ran against a different workspace. Check the `X-Workspace-Id` header against `GET /me`.
@@ -90,12 +92,37 @@ Export endpoints under `/reports/exports/*` return up to 5,000 rows per call. Th
 
 ## Rate limits
 
-Unauthenticated and abuse-prone endpoints are throttled, especially on the [public API](/guides/public-api): order creation is limited per IP, and ticket resend per ticket code. When you hit a limit:
+Unauthenticated and abuse-prone endpoints are throttled, especially on the [public API](/guides/public-api). When you hit a limit:
 
 - The status is `429` and `error.retryable` is `true`.
-- The `Retry-After` header gives the number of seconds to wait.
+- `Retry-After` is **always** present and gives the number of seconds to wait.
+- `error.code` is usually `RATE_LIMITED`. Some endpoints return a more specific code, such as `TOO_MANY_REQUESTS` or `SEAT_BUDGET_EXHAUSTED`.
+
+Some endpoints also send the IETF RateLimit headers (draft-ietf-httpapi-ratelimit-headers) on every response, success or error:
+
+```http
+RateLimit-Policy: "<policy>";q=<quota>;w=<window seconds>
+RateLimit: "<policy>";r=<remaining>;t=<seconds until reset>
+```
+
+| API | Endpoints with RateLimit headers |
+| --- | --- |
+| Public | `POST /orders` (per client IP), `POST /tickets/{code}/resend` (1 per minute per ticket code) |
+| B2B | `POST /auth/signup`, `POST /customer/auth/request` and `/verify` (per client IP), and the buyer-session order and purchase-session endpoints under `/customer` |
+
+Other endpoints can answer `429` without these headers. The counters are fixed windows kept per server instance, so treat the numbers as pacing hints, not as an account quota.
 
 Honor `Retry-After`, back off exponentially on repeated `429`s, and don't retry errors where `retryable` is `false`. Those fail the same way until you change the request.
+
+## Versioning and deprecation
+
+- **Path version.** The B2B API is versioned in the path. A breaking change ships under a new path (`/api/v2`), and `/api/v1` keeps running in parallel until its sunset date.
+- **Contract version.** `info.version` in each OpenAPI document follows semver. A minor version is additive: new endpoints, optional fields, enum values and error codes. Ignore fields you don't know. A patch changes documentation or fixes without changing shapes.
+- **Public API.** `/api/public` is pre-1.0 and has no version in the path, so a minor version there may include a breaking change. A patch never does.
+- **Deprecation signals.** A deprecated operation is marked `deprecated: true` in the contract, and its responses carry `Deprecation` (RFC 9745), `Sunset` (RFC 8594, the HTTP date after which it may stop working) and `Link: <https://appfreeticket.com/desarrolladores>; rel="deprecation"`.
+- **Notice period.** At least 6 months between the first `Deprecation` header and the `Sunset` date on `/api/v1`, and at least 90 days on `/api/public`.
+
+No operation is deprecated today. Log any `Deprecation` header your client receives, so you hear about it before the sunset.
 
 ## Idempotency
 
