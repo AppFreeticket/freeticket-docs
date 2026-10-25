@@ -1,19 +1,24 @@
 ---
 title: FreeTicket for developers
-description: Build on FreeTicket, the ticketing platform for events in Colombia and Latin America. Automate your workspace over a REST API, a command-line tool, or an MCP server for AI agents.
+description: FreeTicket developer docs. A ticketing REST API for Colombia and Latin America, the ft CLI, and an MCP server and agent skills for AI agents.
+seo:
+  title: FreeTicket API, CLI and MCP for event ticketing
 ---
 
-FreeTicket exposes the same operations as its dashboard through three programmatic surfaces. They share one contract and one credential, so anything you prototype in one carries over to the others.
+FreeTicket is a ticketing platform for live events in Colombia and Latin America. Organizers, venues and artists use it to publish events, sell tickets with QR codes, run memberships and check people in at the door. Everything the dashboard does is also available to code, through four surfaces that share one OpenAPI 3.1 contract:
 
-<CardGroup cols={3}>
-  <Card title="REST API" href="/guides" icon="code">
-    The B2B API at `/api/v1` for your workspace, and an anonymous storefront API for buyers.
+<CardGroup cols={2}>
+  <Card title="B2B REST API" href="/guides" icon="code">
+    `/api/v1` with an API key: events, ticket types, sales, refunds, check-in, memberships, reports and settlements.
+  </Card>
+  <Card title="Public storefront API" href="/guides/public-api" icon="store">
+    `/api/public`, no key: published events, live availability, orders with a payment link, and ticket resend.
   </Card>
   <Card title="CLI" href="/cli" icon="terminal">
     `ft`: log in through the browser, then list, create and export from the terminal or a script.
   </Card>
-  <Card title="MCP server" href="/mcp" icon="sparkles">
-    Hosted at `mcp.appfreeticket.com`. Connect Claude, ChatGPT, Cursor and other MCP clients.
+  <Card title="MCP server and agent skills" href="/mcp" icon="sparkles">
+    Hosted at `mcp.appfreeticket.com` with OAuth 2.1. Connect Claude, ChatGPT, Cursor and other MCP clients.
   </Card>
 </CardGroup>
 
@@ -21,10 +26,29 @@ FreeTicket exposes the same operations as its dashboard through three programmat
 
 | You want to… | Use |
 | --- | --- |
-| Integrate FreeTicket into your own backend or website | [REST API](/guides) |
-| Sell tickets from your own storefront without an account | [Public storefront API](/guides/public-api) |
+| Integrate FreeTicket into your own backend or website | [B2B REST API](/guides) |
+| Sell tickets from your own storefront or chatbot, without an account | [Public storefront API](/guides/public-api) |
 | Run one-off operations or shell scripts against your workspace | [CLI](/cli) |
-| Ask an AI assistant about your events, sales and reports | [MCP server](/mcp) |
+| Ask an AI assistant about your events, sales and reports, or let it operate them | [MCP server](/mcp) |
+| Teach a coding agent FreeTicket's commands, tools and product rules | [Agent skills](/mcp/skills) |
+
+The [CLI](/cli) and the [MCP server](/mcp) are clients of the same APIs, so the [authentication](/guides/authentication) and [error](/guides/conventions) rules apply to all of them.
+
+## Get started
+
+<Steps>
+  <Step title="Install the CLI and log in">
+    `npm install -g @freeticket/cli`, then `ft login`. Your browser opens and you approve the session. No account yet? Run `ft signup` first. See [Install the CLI](/cli) and [Log in](/cli/login).
+  </Step>
+  <Step title="Create an API key for your integration">
+    `ft api-keys create my-integration --scope write`. Keys default to `read`. See [Authentication](/guides/authentication).
+  </Step>
+  <Step title="Make your first call">
+    Follow the [quickstart](/guides/quickstart) to create an event, put it on sale and check tickets in at the door.
+  </Step>
+</Steps>
+
+There is no sandbox environment. To experiment, create a separate workspace and use `read` keys where you can.
 
 ## API reference
 
@@ -32,7 +56,7 @@ Both references are generated from the OpenAPI 3.1 contracts the platform serves
 
 <CardGroup cols={2}>
   <Card title="B2B API reference" href="/reference/v1" icon="book-open">
-    Events, dates, ticket types, sales, tickets, memberships, venues, staff, reports, settlements, discounts, webhooks and API keys.
+    Events, dates, ticket types, sales, tickets, memberships, venues, staff, reports, settlements, discounts, webhooks, content, workspaces and API keys.
   </Card>
   <Card title="Public API reference" href="/reference/public" icon="globe">
     Anonymous event catalog, live availability, orders and ticket resend.
@@ -44,16 +68,17 @@ The raw contracts are also available for code generation:
 - B2B: `https://admin.appfreeticket.com/api/v1/openapi.json`
 - Public: `https://appfreeticket.com/api/public/openapi.json`
 
-## Get started
+## Machine-readable discovery
 
-<Steps>
-  <Step title="Install the CLI and log in">
-    `npm install -g @freeticket/cli`, then `ft login`. Your browser opens and you approve the session. See [Install the CLI](/cli).
-  </Step>
-  <Step title="Create an API key for your integration">
-    `ft api-keys create my-integration --scope write`. See [Authentication](/guides/authentication).
-  </Step>
-  <Step title="Make your first call">
-    Follow the [quickstart](/guides/quickstart) to create an event and put it on sale.
-  </Step>
-</Steps>
+Agents and tools can find every surface without scraping:
+
+| Resource | URL |
+| --- | --- |
+| Platform overview for agents, with the events on sale now | `https://appfreeticket.com/llms.txt` |
+| MCP server manifest | `https://appfreeticket.com/.well-known/mcp.json` |
+| API scopes (RFC 9728) | `https://admin.appfreeticket.com/.well-known/oauth-protected-resource` |
+| These docs as an index for LLMs | [`/llms.txt`](https://docs.appfreeticket.com/llms.txt) and [`/llms-full.txt`](https://docs.appfreeticket.com/llms-full.txt) |
+
+Public pages on `appfreeticket.com` that have a Markdown version return it when you send `Accept: text/markdown`.
+
+For a Spanish summary of the platform for developers, see [appfreeticket.com/desarrolladores](https://appfreeticket.com/desarrolladores).
