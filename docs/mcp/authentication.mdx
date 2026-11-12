@@ -1,19 +1,22 @@
 ---
 title: Credentials
-description: How to authenticate to the FreeTicket MCP server with anonymous public access, OAuth 2.1 sign-in or an API key, and how tools pick a workspace.
+description: How to authenticate to the FreeTicket MCP server with anonymous public access, OAuth 2.1 sign-in, read-only connections, buyer sessions or a local stdio server.
 seo:
-  title: "MCP authentication: OAuth 2.1 and API keys"
+  title: "MCP authentication: OAuth 2.1 and scopes"
 ---
 
-The tools you see depend on the credential the client sends.
+The tools you see depend on the credential the connection carries.
 
 | Layer | Endpoint | Credential | Tools |
 | --- | --- | --- | --- |
-| Public (B2C) | `/mcp/public` | None | `public_*`: discovery, availability, orders, ticket resend |
-| OAuth 2.1 sign-in | `/mcp` | Token issued after you sign in to FreeTicket | Public tools plus B2B tools for your workspaces |
-| API key | `/mcp` | `Authorization: Bearer ft_live_xxx` | Public tools plus B2B tools for your workspaces |
+| Public (B2C) | `/mcp/public`, or `/mcp` without sign-in | None | `public_*`: discovery, availability, orders, ticket resend |
+| OAuth 2.1 sign-in | `/mcp` | Access token issued after you sign in to FreeTicket | Public tools plus workspace tools. Only read tools with scope `read`. |
+| Buyer session | `/mcp` | `X-Customer-Session` header | Adds the `customer_*` tools |
+| Local stdio | Your machine | `FT_API_KEY` and other environment variables | The same tools, run locally |
 
-In every layer, B2B tools act with **your role** in the target workspace, exactly like the [API](/guides/authentication#roles).
+In every layer, workspace tools act with **your role** in the target workspace, exactly like the [API](/guides/authentication#roles).
+
+The hosted server doesn't accept a raw API key as a bearer token. A request with `Authorization: Bearer ft_live_…` gets `401 invalid_token`. Sign in with OAuth, or run the server locally over stdio.
 
 ## Public
 
@@ -23,13 +26,15 @@ No account and no setup. Use this layer for agents that help buyers: they search
 https://mcp.appfreeticket.com/mcp/public
 ```
 
+`/mcp` without a token also serves the public tools, and it lists the workspace tools so the assistant knows they exist. Anonymous traffic is limited to 120 requests per minute per IP, and over that the server answers `429` with `Retry-After`.
+
 ## OAuth sign-in
 
 The server embeds an OAuth 2.1 authorization server. This is the default for chat clients like Claude and ChatGPT, which can't send custom headers:
 
 <Steps>
   <Step title="Discovery">
-    An unauthenticated request to `/mcp` returns `401` with a `WWW-Authenticate` header that points to `https://mcp.appfreeticket.com/.well-known/oauth-protected-resource` (RFC 9728). The client discovers the authorization server metadata from there (RFC 8414).
+    Calling a workspace tool without a token returns `401` with a `WWW-Authenticate` header (`scope="b2b"`) that points to `https://mcp.appfreeticket.com/.well-known/oauth-protected-resource` (RFC 9728). The client discovers the authorization server metadata from there (RFC 8414), and shows its sign-in prompt.
   </Step>
   <Step title="Client registration">
     The client registers itself automatically (dynamic client registration, RFC 7591), so there is no client ID or secret to fill in.
@@ -42,28 +47,38 @@ The server embeds an OAuth 2.1 authorization server. This is the default for cha
   </Step>
 </Steps>
 
+Access tokens last 1 hour. Refresh tokens last 30 days, rotate on every use, and the session is capped at 90 days from sign-in. After that you sign in again. Every refresh checks the underlying key with FreeTicket, so revoking it (in the dashboard or with `ft api-keys revoke`) ends the connection within the hour.
+
 Under **Advanced options**, the consent page also lets you paste an API key by hand, and tie the connection to a single workspace.
 
-## API key
+## Read-only connections
 
-For clients that can send headers, such as Claude Code, Cursor, scripts and CI, pass a FreeTicket API key directly:
+Tick **Read only** on the consent page, or request the OAuth scope `read`, for an analysis-only connection. It lists only the tools marked read-only, so the assistant has no write tool to call. A key with `read` scope pasted under **Advanced options** has the same effect. Call `whoami` to see the scope of the connection.
 
-```http
-Authorization: Bearer ft_live_xxx
-X-Workspace-Id: <workspace-id>      # optional
-```
+## Local stdio
 
-Create a dedicated key with `ft api-keys create mcp-agent --scope read` (or `--scope write`). Prefer a `read` key for analysis-only agents: write tools then fail with `403 READ_ONLY_KEY` instead of acting. See [Authentication](/guides/authentication).
+For CI, scripts and headless machines, run the server locally over stdio with an API key:
+
+| Variable | Purpose |
+| --- | --- |
+| `FT_API_KEY` | An `ft_live_…` key. Create one with `ft api-keys create mcp-agent --scope read`, or use the account stored by `ft login`. |
+| `FT_WORKSPACE_ID` | Optional. Pin the connection to one workspace. |
+| `FT_READ_ONLY` | `1` registers only the read tools |
+| `FT_CUSTOMER_SESSION` | Optional. A buyer session, which adds the `customer_*` tools. |
+
+The package isn't published on npm, so build it from [the source repository](https://github.com/AppFreeticket/freeticket-mcp) and point your client at `node dist/index.js`. Prefer a read-only key (`ft login --read-only`) on shared machines.
 
 ## Choosing the workspace
 
 - By default nothing is pinned. List and row-based report tools read **every workspace your credential reaches** and tag each row with `workspaceId` and `workspaceName`.
 - Pass `workspace: ["<id>", …]` to narrow a list to some workspaces, or to one when you need to page deep. `"all"` is the same as leaving it out.
 - Tools that act on one resource (get, create, update, delete…) run against your account's default workspace unless the connection is pinned.
-- To pin the whole connection, send `X-Workspace-Id` with an API key, or fill in the workspace under **Advanced options** during OAuth sign-in.
+- To pin the whole connection, fill in the workspace under **Advanced options** during OAuth sign-in, or set `FT_WORKSPACE_ID` over stdio.
 
 Call the `whoami` tool to see your user, your workspaces and your role in each.
 
 ## Buyer sessions
 
-The `customer_*` tools (a buyer's own tickets, membership and profile) are for enterprise integrations that already hold a buyer session. They require an enterprise service API key in addition to the buyer's session token. Ordinary workspace keys can't use them.
+The `customer_*` tools (a buyer's own tickets, membership, profile and addresses) are for integrations that already hold a buyer session. They appear only when the connection carries that session in the `X-Customer-Session` header, or `FT_CUSTOMER_SESSION` over stdio. The session is never passed as a tool argument, so it doesn't go through the model, and these tools send only the session, never your workspace key.
+
+`merch_orders_lookup` and `customer_merch_orders` need both an enterprise service API key and the buyer session.

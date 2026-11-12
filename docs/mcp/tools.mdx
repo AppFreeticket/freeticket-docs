@@ -1,15 +1,17 @@
 ---
 title: Tool catalog
-description: "Every FreeTicket MCP tool for AI agents, by domain: events, ticket types, sales, refunds, check-in, memberships, reports, settlements and public ordering."
+description: "Every FreeTicket MCP tool for AI agents, by domain: events, ticket types, sales, check-in, memberships, community, merch, reports, settlements and public ordering."
 seo:
   title: FreeTicket MCP tool catalog
 ---
 
-The hosted server exposes 94 tools: 6 public tools and 88 workspace tools. Each tool calls one API operation and returns what the API returns. Roles, validation and errors are the same as in the [B2B API reference](/reference/v1). Tools marked **destructive** ask for confirmation in clients that support it.
+The hosted server exposes up to 200 tools: 6 public tools, 177 workspace tools and 17 buyer tools. Which ones a connection lists depends on its [credentials](/mcp/authentication). Each tool calls one API operation, with the same roles, validation and errors as the [B2B API reference](/reference/v1). Tools marked **destructive** ask for confirmation in clients that support it.
+
+A read-only connection (OAuth scope `read`) lists only the read tools. Write tools don't appear at all, so reconnect with write access if one is missing.
 
 ## Public (no credential)
 
-Available on both `/mcp` and `/mcp/public`.
+Available on `/mcp` with or without sign-in, and on `/mcp/public`.
 
 | Tool | Does |
 | --- | --- |
@@ -26,7 +28,7 @@ Public ordering covers general admission tickets that are not members-only.
 
 | Tool | Does |
 | --- | --- |
-| `whoami` | Your user, your workspaces and your role in each |
+| `whoami` | Your user, your workspaces, your role in each, and the scope of the connection (`read` or `write`) |
 | `workspaces_create` | Create your own workspace. You become its `ADMIN`. |
 
 ## Events and dates
@@ -36,22 +38,48 @@ Public ordering covers general admission tickets that are not members-only.
 | `events_list` · `events_get` | List events (filters: `q`, `status`) or get one |
 | `events_create` | Create an event with its dates |
 | `events_update` · `events_publish` | Edit an event, or publish a draft |
+| `events_schedule` | Schedule a draft: publish it at `publishAt`, or publish now with sales opening later |
+| `events_unschedule` | Clear a pending scheduled publication. **Destructive.** |
 | `events_cancel` | Cancel an event and all its dates, keeping its sales and tickets. **Destructive.** |
 | `events_delete` | Delete an event with no paid sales. **Destructive.** |
-| `event_dates_list` · `event_dates_create` · `event_dates_update` | Dates of an event |
-| `event_dates_delete` | Delete a date. **Destructive.** |
+| `event_dates_list` · `event_dates_create` | Dates of an event, or add one |
+| `event_dates_update` · `event_dates_delete` | Change or delete a date. Moving a date with sold tickets emails the holders. **Destructive.** |
+| `event_dates_access_close_status` | Live entry count and access-close status of a date |
+| `event_dates_access_close_sign` | Sign the access-close record, freezing the check-in count. **Destructive.** |
+| `event_dates_courtesy_seats` | Numbered seats blocked on the map that can be issued as courtesies |
 
-## Ticket types and tickets
+## Lineup and artists
+
+| Tool | Does |
+| --- | --- |
+| `artists_search` | Search artists registered on FreeTicket by name |
+| `events_artists_set` · `events_artists_delete` | Replace the event lineup, or unlink one artist. **Destructive.** |
+| `event_artist_invitations_list` · `event_artist_invitations_resend` | Invitations sent to artists without an account, or resend one |
+| `event_artist_invitations_cancel` | Cancel an invitation. **Destructive.** |
+
+## Ticket types, presales and templates
 
 | Tool | Does |
 | --- | --- |
 | `ticket_types_list` · `ticket_types_get` | Ticket types with price breakdown and stock |
-| `ticket_types_create` · `ticket_types_update` | Create one, or change price, stock or visibility |
+| `ticket_types_create` · `ticket_types_update` | Create one, or change price, stock or visibility. `name` takes up to 100 characters. |
 | `ticket_types_delete` | Delete a ticket type. **Destructive.** |
+| `presale_windows_list` · `presale_windows_create` · `presale_windows_update` | Member presale windows of a ticket type |
+| `presale_windows_delete` | Delete a presale window. **Destructive.** |
+| `ticket_templates_list` · `ticket_templates_create` · `ticket_templates_instantiate` | Reusable ticket type definitions, and creating a ticket type from one |
+| `ticket_templates_update` · `ticket_templates_delete` | Edit (`fields` replaces the whole form) or delete a template. **Destructive.** |
+
+## Tickets and the door
+
+| Tool | Does |
+| --- | --- |
 | `tickets_access` | Check a ticket by its code, without admitting it |
 | `tickets_checkin` | Admit a ticket at the door |
+| `tickets_checkin_undo` | Undo a check-in after a wrong scan. **Destructive.** |
 | `tickets_resend` | Resend a ticket email |
-| `tickets_reassign` | Move a sold ticket to another date or ticket type, for a postponement |
+| `tickets_reassign` | Move a sold ticket to another date or ticket type, for a postponement. Voids the previous QR. **Destructive.** |
+| `events_validators_list` · `events_validators_add` | Door staff who can validate one event's tickets, or assign more |
+| `reports_live_attendance` | Event dates happening now, with check-in progress |
 
 ## Sales
 
@@ -60,8 +88,12 @@ Public ordering covers general admission tickets that are not members-only.
 | `sales_list` · `sales_get` | List sales with filters, or get one with its items |
 | `sales_tickets` | Individual tickets and attendees of a sale |
 | `sales_attempts` | Payment attempt history: why a sale didn't go through |
+| `sales_payment_intents` | Checkout funnel of one event, one journey per visitor |
 | `sales_create` | Record a comp or direct sale |
 | `sales_cancel` · `sales_refund` | Cancel a sale, or refund it whole or by ticket. **Destructive.** |
+| `sales_abandon` | Mark a pending sale whose payment never started as abandoned, releasing its stock. **Destructive.** |
+| `sales_transfer` | Transfer one ticket of a sale to another person. Voids the previous QR. **Destructive.** |
+| `sales_recipient_update` | Correct the recipient of a courtesy sale and resend its tickets. **Destructive.** |
 
 ## Memberships
 
@@ -71,18 +103,26 @@ Public ordering covers general admission tickets that are not members-only.
 | `plans_create` · `plans_update` | Manage plans |
 | `plans_delete` · `subscriptions_cancel` | Delete a plan, or cancel a subscription. **Destructive.** |
 
-## Venues, staff, discounts and webhooks
+## Venues, staff and people
 
 | Tool | Does |
 | --- | --- |
 | `venues_list` · `venues_get` · `venues_create` · `venues_update` | Venues |
 | `venues_delete` | Delete a venue. **Destructive.** |
-| `staff_list` · `staff_get` · `staff_create` · `staff_update_role` | Staff with access to the workspace |
+| `staff_list` · `staff_get` · `staff_create` · `staff_resend_invite` | Staff with access to the workspace, and their invitations |
+| `staff_update_role` · `staff_access_set` | Change a staff member's role, or replace their access. **Destructive.** |
 | `staff_delete` | Revoke someone's access to the workspace. **Destructive.** |
+| `events_viewers_list` · `events_viewers_add` | People with read-only access to one event's statistics |
+| `events_viewers_delete` | Revoke a viewer's access. **Destructive.** |
+
+## Discounts and webhooks
+
+| Tool | Does |
+| --- | --- |
 | `discounts_list` · `discounts_create` · `discounts_update` | Discount codes |
 | `discounts_delete` | Delete a discount code. **Destructive.** |
-| `webhooks_list` · `webhooks_create` · `webhooks_update` | Webhook endpoints. See [Webhooks](/guides/webhooks). |
-| `webhooks_delete` | Delete a webhook. **Destructive.** |
+| `webhooks_list` · `webhooks_create` | Webhook endpoints. See [Webhooks](/guides/webhooks). |
+| `webhooks_update` · `webhooks_delete` | Repoint or delete a webhook. **Destructive.** |
 
 ## Reports and exports
 
@@ -103,13 +143,81 @@ Public ordering covers general admission tickets that are not members-only.
 | `settlements_list` · `settlements_get` | Payouts from FreeTicket to the organizer |
 | `settlements_document` · `settlements_proof` | A signed download link for the settlement PDF or a payment proof, valid for 5 minutes |
 
-## Content
+## Community
 
 | Tool | Does |
 | --- | --- |
-| `content_videos` · `content_posts` · `content_lives` · `content_live_get` | Published videos, community posts and live streams |
-| `content_posts_create` | Publish a community post or an article |
-| `content_playback_token` | Signed playback token: 1 hour for video, 30 minutes for live. Members-only content also needs a buyer session. |
+| `content_posts` · `content_posts_create` · `content_posts_update` · `content_posts_pin` | Community posts and articles |
+| `content_posts_delete` | Delete a post. **Destructive.** |
+| `content_channels_list` · `content_channels_create` · `content_channels_update` · `content_channels_reorder` | Community channels. Listing creates the default channels on a workspace that has none. |
+| `content_channels_archive` | Archive a channel. **Destructive.** |
+| `content_moderation_queue` · `content_moderation_bans` | Reported comments, and banned members |
+| `content_comments_hide` · `content_comments_unhide` · `content_comments_ignore_reports` | Moderate a reported comment |
+| `content_comments_delete` | Delete a comment and its replies. **Destructive.** |
+| `content_member_posts_list` · `content_member_posts_approve` | Member posts awaiting review, and approving one |
+| `content_member_posts_reject` · `content_member_posts_remove` | Reject a pending member post or remove a published one. Neither bans the author. **Destructive.** |
+| `content_members_ban` | Ban a member from the community. **Destructive.** |
+| `content_members_unban` | Lift a ban |
+| `content_meetups_list` · `content_meetups_get` · `content_meetups_create` · `content_meetups_update` · `content_meetups_publish` | Community meetups |
+| `content_meetups_rsvp_review` · `content_meetups_attendance` | Approve RSVP requests, and mark attendance |
+| `content_meetups_cancel` | Cancel a meetup. **Destructive.** |
+
+To ban the author of a post, call `content_members_ban` separately.
+
+## Video and live streams
+
+| Tool | Does |
+| --- | --- |
+| `content_videos` · `content_videos_update` · `content_videos_set_published` · `content_videos_set_series` | On-demand videos |
+| `content_videos_delete` | Delete a video and its encoded file. **Destructive.** |
+| `content_series_list` · `content_series_create` · `content_series_update` · `content_series_set_published` | Video series |
+| `content_series_delete` | Delete a series. Its videos stay. **Destructive.** |
+| `content_lives` · `content_live_get` · `content_lives_chat` | Live streams, and the chat of one |
+| `content_lives_create` · `content_lives_update` | Create a live stream (returns the stream key), or reschedule it |
+| `content_lives_reset_key` · `content_lives_delete` | Rotate the stream key, or delete the stream. **Destructive.** |
+| `content_playback_token` | Signed playback token: 1 hour for video, 30 minutes for live. Members-only content also needs a buyer session in the `X-Customer-Session` header. |
+
+`content_lives_create`, `content_lives_reset_key` and `master_qrs_*` return secrets (a stream key, a box-office QR). The tool descriptions tell the agent not to repeat them in the chat unless you ask.
+
+## Digital products and courses
+
+| Tool | Does |
+| --- | --- |
+| `products_list` · `products_get` · `products_create` · `products_set_status` | Downloadable products and courses, and publishing them |
+| `products_update` | Edit a product. Sending `modules` replaces the whole course tree. **Destructive.** |
+| `products_delete` | Delete a product. **Destructive.** |
+
+## Website and profile
+
+| Tool | Does |
+| --- | --- |
+| `website_get` · `website_set_published` | Website configuration, and listing the public page |
+| `website_put` | Save the website configuration. Full replacement. **Destructive.** |
+| `organization_profile_get` · `organization_profile_update` | Workspace profile: artist data, photos, contact and social links |
+| `organization_update` · `organization_analytics_update` | Public name and images, and the brand's own GA4 measurement ID |
+
+## Box-office QR codes
+
+| Tool | Does |
+| --- | --- |
+| `master_qrs_list` · `master_qrs_create` · `master_qrs_update` · `master_qrs_set_active` | Master box-office QR codes |
+| `master_qrs_delete` | Delete a QR. The printed code stops working. **Destructive.** |
+
+## Merch store
+
+| Tool | Does |
+| --- | --- |
+| `merch_catalog` | The brand's public merch catalog. Needs an enterprise service API key. |
+| `merch_products_list` · `merch_products_create` · `merch_products_set_status` | Merch products, created as drafts, and publishing them |
+| `merch_products_set_images` | Replace a product's photos. **Destructive.** |
+| `merch_orders_lookup` · `customer_merch_orders` | A buyer's merch order by code, or all their orders. Need an enterprise service API key **and** a buyer session. |
+
+## Waitlist
+
+| Tool | Does |
+| --- | --- |
+| `waitlist_list` | Per-city waitlist entries of the workspace's landing |
+| `waitlist_join` | Add a person to a per-city waitlist. Needs an enterprise service API key. |
 
 ## Credentials
 
@@ -119,13 +227,33 @@ Public ordering covers general admission tickets that are not members-only.
 
 Creating and revoking keys is not available as a tool. Use the [CLI](/cli/commands#api-keys) or the API.
 
-## Members area (enterprise)
+## Buyer (customer session)
 
-`customer_me`, `customer_tickets`, `customer_ticket_get`, `customer_membership`, `customer_profile`, `customer_profile_update`, `customer_order_pending`, `customer_order_get`, `customer_order_release`, `customer_subscribe`, `customer_subscription_cancel`, `customer_ticket_cancel` and `customer_logout` act on behalf of a signed-in buyer. They require an enterprise service API key plus the buyer's session token. See [Credentials](/mcp/authentication#buyer-sessions).
+These 17 tools act on behalf of one signed-in buyer. They appear only when the connection carries a buyer session in the `X-Customer-Session` header (`FT_CUSTOMER_SESSION` over stdio). The session is never a tool argument. See [Credentials](/mcp/authentication#buyer-sessions).
+
+| Tool | Does |
+| --- | --- |
+| `customer_me` · `customer_profile` · `customer_profile_update` | The buyer's account and profile |
+| `customer_tickets` · `customer_ticket_get` | The buyer's tickets |
+| `customer_ticket_cancel` | Cancel one of the buyer's tickets. **Destructive.** |
+| `customer_order_pending` · `customer_order_get` | The buyer's pending order |
+| `customer_order_release` | Release the pending order and its stock. **Destructive.** |
+| `customer_membership` · `customer_subscribe` | The buyer's membership, or subscribe to a plan. `customer_membership` takes `workspaceId`. |
+| `customer_subscription_cancel` | Cancel the buyer's subscription. Takes `workspaceId`. **Destructive.** |
+| `customer_addresses_list` · `customer_addresses_create` · `customer_addresses_update` | Saved shipping addresses, up to 10 |
+| `customer_addresses_delete` | Delete a saved address. **Destructive.** |
+| `customer_logout` | End the buyer session |
 
 ## Platform staff
 
-A separate set of `admin_*` tools manages the platform itself. They appear only for FreeTicket staff credentials and are not available to workspace accounts.
+A separate set of `admin_*` tools manages the platform itself. They are only available on a local stdio server started with `FT_ADMIN_SESSION`. The hosted server never exposes them.
+
+## Output and errors
+
+- Responses are compact JSON, capped at 25,000 characters. When a list doesn't fit, it is cut by whole items and carries `truncated: { shown, total, field, hint }`, with `page.nextCursor` set to `null`. To continue without skipping rows, repeat the same call with the same `cursor` and `limit` set to `shown`.
+- `sales_list`, `sales_tickets`, `sales_attempts`, `reports_export_buyers` and `reports_export_attendees` return trimmed rows by default. Pass `verbose: true` for the full row.
+- `limit` is a number from 1 to 100.
+- Errors keep the API's `error.code` and add `status`, `retryable`, a `hint` with the next step and, after a `429`, `retryAfterSeconds`.
 
 ## Rendered results
 
@@ -138,4 +266,4 @@ Unless the connection is pinned to one workspace, list and row-based report tool
 - Leave it out, or pass `"all"`: every workspace you can access.
 - `["id1", "id2"]`: only those workspaces. An id you can't reach comes back as an error for that id instead of being dropped silently.
 
-Rows are tagged with `workspaceId` and `workspaceName`. Aggregated results carry no pagination cursor, so name one workspace to page deep. A workspace that fails is reported while the others still return. `reports_summary` returns KPIs for one workspace only, because KPIs can't be added up across workspaces.
+Rows are tagged with `workspaceId` and `workspaceName`. Aggregated results carry no pagination cursor, so name one workspace to page deep. A workspace that fails is reported while the others still return. `reports_summary` returns KPIs for one workspace only, because KPIs can't be added up across workspaces. Writes always act on one workspace.

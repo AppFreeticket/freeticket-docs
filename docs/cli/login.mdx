@@ -29,7 +29,7 @@ The CLI uses the OAuth 2.0 Device Authorization Grant (RFC 8628), the same flow 
     Sign in to FreeTicket as usual, check that the code matches, and approve. The code is valid for 10 minutes.
   </Step>
   <Step title="The CLI stores the account">
-    The CLI receives a `write` API key named "FreeTicket CLI", checks it against `GET /me`, saves it in `~/.freeticket/config.json` and prints your user.
+    The CLI receives an API key named "FreeTicket CLI", checks it against `GET /me`, saves it in `~/.freeticket/config.json` and prints your user. The key can write unless you tick **Read only** on the approval page or log in with `--read-only`.
   </Step>
 </Steps>
 
@@ -37,6 +37,7 @@ The key acts with your role in each workspace. A login pins no workspace: list c
 
 | Option | Purpose |
 | --- | --- |
+| `--read-only` | Request a `read` key. The approval page starts with **Read only** ticked, and the CLI refuses to store a key that can write. |
 | `--account <name>` | Store this login under a name. Defaults to the account's email. A login with the same name replaces it. |
 | `--workspace <id>` | Pin this login to one workspace |
 | `--url <url>` | Use another API base URL |
@@ -98,7 +99,7 @@ The secret is printed once and never stored by FreeTicket. Keys default to `read
 ## Inspect and log out
 
 ```bash
-ft whoami          # user, workspaces and role in each, for every account (GET /me)
+ft whoami          # user, workspaces, role in each and key scope, for every account (GET /me)
 ft config          # API URL, masked credentials, pinned account and workspace
 ft logout          # remove the pinned (or only) account
 ft logout --all    # remove every stored account
