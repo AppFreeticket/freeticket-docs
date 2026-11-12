@@ -28,7 +28,7 @@ ft login                                   # approve in the browser
 ft api-keys create my-integration --scope write
 ```
 
-`ft login` uses the OAuth 2.0 Device Authorization Grant (RFC 8628, `POST /auth/device/code` and `POST /auth/device/token`). It prints a short code, opens `https://admin.appfreeticket.com/device`, and you approve where you are already signed in. The CLI then receives its own `write` key, named "FreeTicket CLI". Next, `ft api-keys create` mints a dedicated key for your integration and prints the secret once. See [Log in](/cli/login).
+`ft login` uses the OAuth 2.0 Device Authorization Grant (RFC 8628, `POST /auth/device/code` and `POST /auth/device/token`). It prints a short code, opens `https://admin.appfreeticket.com/device`, and you approve where you are already signed in. The CLI then receives its own key, named "FreeTicket CLI": `write` by default, or `read` if you tick **Read only** on the approval page or run `ft login --read-only`. Next, `ft api-keys create` mints a dedicated key for your integration and prints the secret once. See [Log in](/cli/login).
 
 Optional: `--expires 2027-01-01` sets an expiry date.
 
@@ -84,7 +84,7 @@ Each key has one scope:
 | `read` | `GET` and `HEAD` only |
 | `write` | Reads, plus create, update, delete, publish, cancel, refund and check-in |
 
-A `read` key that calls a mutating method gets `403` with the code `READ_ONLY_KEY`. Keys created with `POST /api-keys` or `ft api-keys create` default to `read`. The key that `ft login` stores in the CLI can write.
+A `read` key that calls a mutating method gets `403` with the code `READ_ONLY_KEY`. Keys created with `POST /api-keys` or `ft api-keys create` default to `read`. The key that `ft login` stores in the CLI can write, unless you logged in with `--read-only`.
 
 A key can also be restricted to a subset of the workspace's events. Such a key only reads and writes those events and what derives from them (dates, ticket types, sales, reports). Anything else returns `403 EVENT_SCOPE_FORBIDDEN`, and the key can't manage API keys.
 
@@ -99,6 +99,7 @@ Scope says what a key *may* do. The user's **role in the target workspace** says
 | `VIEWER` | Read events, ticket types, sales lists, plans, venues and most reports |
 | `STAFF` | Plus sale details, a sale's tickets, ticket access checks and door check-in |
 | `ADMIN` | Plus every write, staff management, exports, settlements, discounts, webhooks and API keys |
+| `MERCH_MANAGER` | Only the merch store catalog: products, photos and publishing |
 
 The role is resolved on every request, so changing a user's role takes effect without reissuing their keys. A role below the minimum returns `403`. If the user's access to the workspace expired or doesn't cover a section, the API returns `403` with `ACCESS_EXPIRED` or `SECTION_FORBIDDEN`.
 
@@ -129,12 +130,13 @@ curl https://admin.appfreeticket.com/api/v1/me \
     "activeWorkspaceId": "…",
     "workspaces": [
       { "id": "…", "name": "My Venue", "slug": "my-venue", "role": "ADMIN", "sections": null }
-    ]
+    ],
+    "scope": "write"
   }
 }
 ```
 
-In each workspace row, `sections: null` means unrestricted access and `[]` means access has expired or been revoked. Use the `role` in each row. The top-level `role` is deprecated.
+`scope` is the scope of the key in use, `read` or `write`. In each workspace row, `sections: null` means unrestricted access and `[]` means access has expired or been revoked. Use the `role` in each row. The top-level `role` is deprecated.
 
 :::warning
 `X-Workspace-Id` takes a workspace **id**, not a slug. An id the key can't reach is ignored, and the request falls back to the default workspace. Read ids from `GET /me` rather than hard-coding them.

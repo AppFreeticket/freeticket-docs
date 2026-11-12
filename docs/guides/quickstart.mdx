@@ -88,7 +88,7 @@ curl -s -X POST $FT/ticket-types \
   }'
 ```
 
-Save `data.id` as `TICKET_TYPE_ID`. The response also includes the buyer-facing breakdown (`buyerServiceFee`, `iva`, `buyerTotal`): the price the buyer actually pays per unit. Set `saleStartsAt` and `saleEndsAt` to open and close sales on a schedule.
+Save `data.id` as `TICKET_TYPE_ID`. The response also includes the buyer-facing breakdown (`buyerServiceFee`, `iva`, `buyerTotal`): the price the buyer actually pays per unit. Set `saleStartsAt` and `saleEndsAt` to open and close sales on a schedule. `name` takes up to 100 characters and `price` up to 9,999,999,999. Values out of range return `422`.
 
   </Step>
   <Step title="Publish">
@@ -100,6 +100,8 @@ curl -s -X POST $FT/events/$EVENT_ID/publish \
 ```
 
 Publishing needs at least one future date. Without one, it returns `409`. Once published, the event can be sold through the storefront and the public API.
+
+To publish later instead, call `POST /events/{id}/schedule` with `publishAt`, or with `saleStartsAt` to publish now and open sales at that instant. `DELETE /events/{id}/schedule` clears a pending schedule.
 
   </Step>
   <Step title="Sell a ticket">

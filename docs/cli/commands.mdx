@@ -5,7 +5,7 @@ seo:
   title: FreeTicket CLI command reference
 ---
 
-Each command calls one [B2B API](/reference/v1) operation and needs the same minimum role in the target workspace. This page matches `@freeticket/cli` 0.11. Run `ft <command> --help` for the exact flags of your installed version.
+Each command calls one [B2B API](/reference/v1) operation and needs the same minimum role in the target workspace. This page matches `@freeticket/cli` 0.14. Run `ft <command> --help` for the exact flags of your installed version.
 
 ## Shared flags
 
@@ -31,8 +31,8 @@ Write commands take the same JSON body the API does. The [API reference](/refere
 | Command | Purpose |
 | --- | --- |
 | `ft signup --email <email> --name <name>` | Create an account. `--workspace-name` also creates its first workspace. |
-| `ft login` | Browser login, adds an account. `--key <key>` for CI, `--account <name>` to name it. See [Log in](/cli/login). |
-| `ft whoami` | Your user and workspaces, for every stored account |
+| `ft login` | Browser login, adds an account. `--read-only` for a `read` key, `--key <key>` for CI, `--account <name>` to name it. See [Log in](/cli/login). |
+| `ft whoami` | Your user, workspaces and key scope, for every stored account |
 | `ft config` | Show the active configuration, with credentials masked |
 | `ft logout` | Remove the pinned or only account. `--account <name>`, `--all`. |
 | `ft account list` · `use <name>` · `clear` · `remove <name>` | List, pin, unpin and remove stored accounts |
@@ -164,6 +164,28 @@ Exports return up to 5,000 rows. Add `--csv` for spreadsheets.
 | `ft settlements list` | ADMIN | Payouts to the organizer. Filters: `--event`, `--status <SENT\|AWAITING_PAYMENT\|PAID>` |
 | `ft settlements get <id>` | ADMIN | One settlement |
 | `ft settlements document <id>` | ADMIN | Signed download URL for the settlement PDF, valid for 5 minutes. `--proof <fileName>` downloads a payment proof instead. |
+
+## Merch store
+
+These commands manage the merch store catalog of the workspace's organization. They need the `ADMIN` or `MERCH_MANAGER` role.
+
+| Command | Purpose |
+| --- | --- |
+| `ft merch products list` | Products, `DRAFT` and `PUBLISHED`, with their variants |
+| `ft merch products create` | Create products as `DRAFT`: `--name`, `--price <cop>`, `--sizes XS,S,M`, `--stock <n>`, `--image <path>` (repeatable, uploaded through a signed URL), `--publish`. `--from-json <file>` creates several in one run. With `--json` it prints `{ created, failed }`. |
+| `ft merch products images <id> --image <path>` | Replace a product's photos with local files, for example to repair a partial `create` |
+| `ft merch products publish <id>` · `unpublish <id>` | Show or hide a product in the store. Publishing needs the store set up and an active variant. |
+
+```bash
+ft merch products create --name "Camiseta gira 2026" --price 90000 --sizes S,M,L --stock 20 --image ./front.jpg
+```
+
+## Waitlist
+
+| Command | Role | Purpose |
+| --- | --- | --- |
+| `ft waitlist list` | ADMIN | Per-city waitlist entries of an enterprise landing, with personal data. Filter with `--city <name>`. |
+| `ft waitlist create --data <json>` | ADMIN | Add an entry. Needs an enterprise service key. |
 
 ## Content
 

@@ -88,6 +88,8 @@ done
 
 A cursor only means something inside the workspace that issued it, so keep `X-Workspace-Id` fixed while you walk the pages.
 
+`GET /customer/merch-orders` is the exception: it returns `{ data, nextCursor }` without a `page` object.
+
 Export endpoints under `/reports/exports/*` return up to 5,000 rows per call. The public event catalog uses `page` and `pageSize` (up to 50) instead of cursors.
 
 ## Rate limits
@@ -138,6 +140,8 @@ curl -X POST $FT/sales \
 ```
 
 Send one on every sale your client might retry, for example after a timeout. A key longer than 255 characters returns `422` rather than being silently ignored.
+
+`POST /merch/orders` accepts the same header, unique per store. A replay returns the original order without reserving stock again, and only to the same buyer: reusing the key for another buyer returns `422 IDEMPOTENCY_KEY_REUSED`. `POST /waitlist` is idempotent on city and contact without a header: the first call returns `201` with `created: true`, and repeats return `200` with `created: false`.
 
 ## Dates, money and time zones
 
